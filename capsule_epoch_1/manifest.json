@@ -1,0 +1,52 @@
+{
+  "agent_id": "hdar-cross-platform-agent",
+  "continuation_point": "Host A sealed epoch 1; Host B must restore, execute pipeline, seal epoch 2.",
+  "created_at": 1784630391.00249,
+  "epoch": 1,
+  "manifest_hash": "2737e7a611b1d900339c515995c4fe13ff522487cba8c5af6f4a648a6d3fb077",
+  "objective": "Cross-platform HDAR continuation proof",
+  "owner_public_key": "3fa03ea8102c4c322e91f2ec8a05555abb0bbf37566d8936948d50462748166b",
+  "owner_signature": "8b5f73fe633bd0772c83bb276a1a3fdf5b0013a6549414ca1fcd85445b0184c65f6ac4e979b59f654a8e33ef254d40da6f57691343fedc150df0c69731aa2300",
+  "owner_signature_algorithm": "ed25519",
+  "parent_manifest_hash": null,
+  "protocol_version": "hdar-canonical/v1.0",
+  "schema": "hdar.transport-capsule/v0.1",
+  "source_host_label": "host-a-local-mac",
+  "source_host_platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "workspace_manifest": {
+    "files": [
+      {
+        "mode": 420,
+        "rel_path": "agent_state.json",
+        "sha256": "62f667e222275d44bc2bca50a0e3158f7d312dd6abd79c5e7e6189ff146b0db2",
+        "size": 384
+      },
+      {
+        "mode": 420,
+        "rel_path": "data/input_records.jsonl",
+        "sha256": "cefc1c255a67a3c52ed5ef19974ebb87edd1def50fb7045adef2390238d5fcd3",
+        "size": 4162
+      },
+      {
+        "mode": 420,
+        "rel_path": "progress.log",
+        "sha256": "af6265ed61c5a86c62a03ee29a6076f9e4cd4c0aa21540b21ea649243f669eb3",
+        "size": 94
+      },
+      {
+        "mode": 420,
+        "rel_path": "src/worker.py",
+        "sha256": "6ca43441762bdd5cc63a728b2a277a4976f5ff92d391d94c9046a5d49b21e564",
+        "size": 5180
+      },
+      {
+        "mode": 420,
+        "rel_path": "todo.md",
+        "sha256": "36a1743fd2b4c003a581775fd333cd028e7674aaf9356b81d4a6f0e78f9eee95",
+        "size": 145
+      }
+    ],
+    "root_hash": "b49b5b8770c4d0ca4b2c6c90e3483472f6e7a0208280eb242117e0677107bc48",
+    "total_size": 9965
+  }
+}

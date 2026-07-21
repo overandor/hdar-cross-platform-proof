@@ -1,0 +1,451 @@
+{
+  "host_a_platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "host_b_results": [
+    {
+      "all_passed": true,
+      "checks": [
+        {
+          "check": "E1 manifest hash valid",
+          "detail": "expected=2737e7a611b1d900... actual=2737e7a611b1d900...",
+          "passed": true
+        },
+        {
+          "check": "E1 Ed25519 owner signature valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E1 receipt hash valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 manifest hash valid",
+          "detail": "expected=eb764d48972ac95d... actual=eb764d48972ac95d...",
+          "passed": true
+        },
+        {
+          "check": "E2 receipt hash valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "Cryptographic lineage E1\u2192E2",
+          "detail": "E2.parent=2737e7a611b1d900... E1.hash=2737e7a611b1d900...",
+          "passed": true
+        },
+        {
+          "check": "Epoch advancement 1\u21922",
+          "detail": "E1.epoch=1 E2.epoch=2",
+          "passed": true
+        },
+        {
+          "check": "Platform separation (Host A \u2260 Host B)",
+          "detail": "A=macOS-26.5.2-arm64-arm-64bit-Mach-O B=Linux-6.8.0-1052-azure-x86_64-with-glibc2.39",
+          "passed": true
+        },
+        {
+          "check": "Owner public key consistent",
+          "detail": "manifest=3fa03ea8102c4c32... expected=3fa03ea8102c4c32...",
+          "passed": true
+        },
+        {
+          "check": "Host B report confirms platform separation",
+          "detail": "report says: True",
+          "passed": true
+        },
+        {
+          "check": "E1 receipt workspace hash matches manifest",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 receipt workspace hash matches manifest",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 workspace differs from E1",
+          "detail": "E1=b49b5b8770c4d0ca... E2=06aa7409bfc1d429...",
+          "passed": true
+        },
+        {
+          "check": "E2 workspace grew",
+          "detail": "E1=9965B E2=17242B",
+          "passed": true
+        },
+        {
+          "check": "Shared workspace files preserved",
+          "detail": "shared: ['agent_state.json', 'data/input_records.jsonl', 'progress.log', 'src/worker.py', 'todo.md']",
+          "passed": true
+        },
+        {
+          "check": "Host B nonce present (fresh evidence)",
+          "detail": "nonce=956fece5-cf6f-4a...",
+          "passed": true
+        },
+        {
+          "check": "Host B UTC timestamps present",
+          "detail": "start=2026-07-21T11:08:04.130736+00:00 end=2026-07-21T11:08:04.275987+00:00",
+          "passed": true
+        },
+        {
+          "check": "Host B hostname present",
+          "detail": "hostname=codespaces-855c05",
+          "passed": true
+        },
+        {
+          "check": "Pipeline output hash in report",
+          "detail": "hash=8708384aa5f7118c...",
+          "passed": true
+        },
+        {
+          "check": "E2 content blocks all valid",
+          "detail": "all blocks verified",
+          "passed": true
+        }
+      ],
+      "failed": 0,
+      "failures": [],
+      "host_label": "codespaces-linux",
+      "passed": 20,
+      "total_checks": 20
+    },
+    {
+      "all_passed": true,
+      "checks": [
+        {
+          "check": "E1 manifest hash valid",
+          "detail": "expected=2737e7a611b1d900... actual=2737e7a611b1d900...",
+          "passed": true
+        },
+        {
+          "check": "E1 Ed25519 owner signature valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E1 receipt hash valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 manifest hash valid",
+          "detail": "expected=9011c43cbbe7003b... actual=9011c43cbbe7003b...",
+          "passed": true
+        },
+        {
+          "check": "E2 receipt hash valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "Cryptographic lineage E1\u2192E2",
+          "detail": "E2.parent=2737e7a611b1d900... E1.hash=2737e7a611b1d900...",
+          "passed": true
+        },
+        {
+          "check": "Epoch advancement 1\u21922",
+          "detail": "E1.epoch=1 E2.epoch=2",
+          "passed": true
+        },
+        {
+          "check": "Platform separation (Host A \u2260 Host B)",
+          "detail": "A=macOS-26.5.2-arm64-arm-64bit-Mach-O B=Linux-6.8.0-1062-azure-x86_64-with-glibc2.35",
+          "passed": true
+        },
+        {
+          "check": "Owner public key consistent",
+          "detail": "manifest=3fa03ea8102c4c32... expected=3fa03ea8102c4c32...",
+          "passed": true
+        },
+        {
+          "check": "Host B report confirms platform separation",
+          "detail": "report says: True",
+          "passed": true
+        },
+        {
+          "check": "E1 receipt workspace hash matches manifest",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 receipt workspace hash matches manifest",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 workspace differs from E1",
+          "detail": "E1=b49b5b8770c4d0ca... E2=f7ff8fd15bd999ac...",
+          "passed": true
+        },
+        {
+          "check": "E2 workspace grew",
+          "detail": "E1=9965B E2=17242B",
+          "passed": true
+        },
+        {
+          "check": "Shared workspace files preserved",
+          "detail": "shared: ['agent_state.json', 'data/input_records.jsonl', 'progress.log', 'src/worker.py', 'todo.md']",
+          "passed": true
+        },
+        {
+          "check": "Host B nonce present (fresh evidence)",
+          "detail": "nonce=54ea8517-c219-4e...",
+          "passed": true
+        },
+        {
+          "check": "Host B UTC timestamps present",
+          "detail": "start=2026-07-21T11:11:13.358644+00:00 end=2026-07-21T11:11:13.411416+00:00",
+          "passed": true
+        },
+        {
+          "check": "Host B hostname present",
+          "detail": "hostname=runnervm76tkm",
+          "passed": true
+        },
+        {
+          "check": "Pipeline output hash in report",
+          "detail": "hash=8708384aa5f7118c...",
+          "passed": true
+        },
+        {
+          "check": "E2 content blocks all valid",
+          "detail": "all blocks verified",
+          "passed": true
+        }
+      ],
+      "failed": 0,
+      "failures": [],
+      "host_label": "github-actions-ubuntu-22.04",
+      "passed": 20,
+      "total_checks": 20
+    },
+    {
+      "all_passed": true,
+      "checks": [
+        {
+          "check": "E1 manifest hash valid",
+          "detail": "expected=2737e7a611b1d900... actual=2737e7a611b1d900...",
+          "passed": true
+        },
+        {
+          "check": "E1 Ed25519 owner signature valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E1 receipt hash valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 manifest hash valid",
+          "detail": "expected=b60f0970ff28cd4c... actual=b60f0970ff28cd4c...",
+          "passed": true
+        },
+        {
+          "check": "E2 receipt hash valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "Cryptographic lineage E1\u2192E2",
+          "detail": "E2.parent=2737e7a611b1d900... E1.hash=2737e7a611b1d900...",
+          "passed": true
+        },
+        {
+          "check": "Epoch advancement 1\u21922",
+          "detail": "E1.epoch=1 E2.epoch=2",
+          "passed": true
+        },
+        {
+          "check": "Platform separation (Host A \u2260 Host B)",
+          "detail": "A=macOS-26.5.2-arm64-arm-64bit-Mach-O B=Linux-6.17.0-1020-azure-x86_64-with-glibc2.39",
+          "passed": true
+        },
+        {
+          "check": "Owner public key consistent",
+          "detail": "manifest=3fa03ea8102c4c32... expected=3fa03ea8102c4c32...",
+          "passed": true
+        },
+        {
+          "check": "Host B report confirms platform separation",
+          "detail": "report says: True",
+          "passed": true
+        },
+        {
+          "check": "E1 receipt workspace hash matches manifest",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 receipt workspace hash matches manifest",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 workspace differs from E1",
+          "detail": "E1=b49b5b8770c4d0ca... E2=f7ff8fd15bd999ac...",
+          "passed": true
+        },
+        {
+          "check": "E2 workspace grew",
+          "detail": "E1=9965B E2=17242B",
+          "passed": true
+        },
+        {
+          "check": "Shared workspace files preserved",
+          "detail": "shared: ['agent_state.json', 'data/input_records.jsonl', 'progress.log', 'src/worker.py', 'todo.md']",
+          "passed": true
+        },
+        {
+          "check": "Host B nonce present (fresh evidence)",
+          "detail": "nonce=e4adfb13-8f3a-43...",
+          "passed": true
+        },
+        {
+          "check": "Host B UTC timestamps present",
+          "detail": "start=2026-07-21T11:11:13.457945+00:00 end=2026-07-21T11:11:13.511963+00:00",
+          "passed": true
+        },
+        {
+          "check": "Host B hostname present",
+          "detail": "hostname=runnervm3jd5f",
+          "passed": true
+        },
+        {
+          "check": "Pipeline output hash in report",
+          "detail": "hash=8708384aa5f7118c...",
+          "passed": true
+        },
+        {
+          "check": "E2 content blocks all valid",
+          "detail": "all blocks verified",
+          "passed": true
+        }
+      ],
+      "failed": 0,
+      "failures": [],
+      "host_label": "github-actions-ubuntu-24.04",
+      "passed": 20,
+      "total_checks": 20
+    },
+    {
+      "all_passed": true,
+      "checks": [
+        {
+          "check": "E1 manifest hash valid",
+          "detail": "expected=2737e7a611b1d900... actual=2737e7a611b1d900...",
+          "passed": true
+        },
+        {
+          "check": "E1 Ed25519 owner signature valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E1 receipt hash valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 manifest hash valid",
+          "detail": "expected=0660e28d52e11017... actual=0660e28d52e11017...",
+          "passed": true
+        },
+        {
+          "check": "E2 receipt hash valid",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "Cryptographic lineage E1\u2192E2",
+          "detail": "E2.parent=2737e7a611b1d900... E1.hash=2737e7a611b1d900...",
+          "passed": true
+        },
+        {
+          "check": "Epoch advancement 1\u21922",
+          "detail": "E1.epoch=1 E2.epoch=2",
+          "passed": true
+        },
+        {
+          "check": "Platform separation (Host A \u2260 Host B)",
+          "detail": "A=macOS-26.5.2-arm64-arm-64bit-Mach-O B=macOS-14.8.7-arm64-arm-64bit",
+          "passed": true
+        },
+        {
+          "check": "Owner public key consistent",
+          "detail": "manifest=3fa03ea8102c4c32... expected=3fa03ea8102c4c32...",
+          "passed": true
+        },
+        {
+          "check": "Host B report confirms platform separation",
+          "detail": "report says: True",
+          "passed": true
+        },
+        {
+          "check": "E1 receipt workspace hash matches manifest",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 receipt workspace hash matches manifest",
+          "detail": "",
+          "passed": true
+        },
+        {
+          "check": "E2 workspace differs from E1",
+          "detail": "E1=b49b5b8770c4d0ca... E2=f7ff8fd15bd999ac...",
+          "passed": true
+        },
+        {
+          "check": "E2 workspace grew",
+          "detail": "E1=9965B E2=17242B",
+          "passed": true
+        },
+        {
+          "check": "Shared workspace files preserved",
+          "detail": "shared: ['agent_state.json', 'data/input_records.jsonl', 'progress.log', 'src/worker.py', 'todo.md']",
+          "passed": true
+        },
+        {
+          "check": "Host B nonce present (fresh evidence)",
+          "detail": "nonce=8bc35098-028e-44...",
+          "passed": true
+        },
+        {
+          "check": "Host B UTC timestamps present",
+          "detail": "start=2026-07-21T11:11:15.126584+00:00 end=2026-07-21T11:11:15.219622+00:00",
+          "passed": true
+        },
+        {
+          "check": "Host B hostname present",
+          "detail": "hostname=sat12-bq161-60eac66f-ecf1-46ce-9984-be9c1183b9c8-A65341B37F13.local",
+          "passed": true
+        },
+        {
+          "check": "Pipeline output hash in report",
+          "detail": "hash=8708384aa5f7118c...",
+          "passed": true
+        },
+        {
+          "check": "E2 content blocks all valid",
+          "detail": "all blocks verified",
+          "passed": true
+        }
+      ],
+      "failed": 0,
+      "failures": [],
+      "host_label": "github-actions-macos-14",
+      "passed": 20,
+      "total_checks": 20
+    }
+  ],
+  "overall_passed": true,
+  "platform_separations_confirmed": 4,
+  "schema": "hdar.verifier-report/v1.0",
+  "total_host_b_reports": 4,
+  "verifier_platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "verifier_timestamp": 1784634397.28237
+}

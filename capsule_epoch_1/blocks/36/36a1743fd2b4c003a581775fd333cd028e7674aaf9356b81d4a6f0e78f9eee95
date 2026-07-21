@@ -1,0 +1,9 @@
+# HDAR Task List
+
+## Epoch 1 (Host A)
+- [x] Create workspace
+- [x] Seal capsule
+
+## Epoch 2 (Host B)
+- [ ] Execute pipeline
+- [ ] Seal successor
