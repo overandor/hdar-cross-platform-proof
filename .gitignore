@@ -1,0 +1,8 @@
+run_host_b_embedded.py
+*.pyc
+__pycache__/
+.DS_Store
+host_b_output/
+e2b_output/
+*.tar.gz
+owner_private_key.txt
