@@ -348,13 +348,20 @@ def seal_capsule(workspace: Path, capsule_dir: Path, owner_priv: bytes, owner_pu
         "owner_signature_algorithm": "ed25519",
     }
 
-    # Sign the manifest content (excluding manifest_hash and owner_signature)
-    signing_content = {k: v for k, v in manifest.items() if k not in ("manifest_hash", "owner_signature")}
-    manifest["manifest_hash"] = sha256_bytes(canonical_json(signing_content))
-    manifest["owner_signature"] = sign_message(owner_priv, manifest["manifest_hash"].encode()).hex()
-
-    (capsule_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
-
+    # Bind the receipt hash into the manifest (audit defect 6: receipts were
+    # self-hashed only, not anchored into the signed manifest).
+    #
+    # The receipt hash is computed over receipt fields EXCLUDING manifest_hash
+    # and receipt_hash. This avoids the circular dependency: the manifest hash
+    # depends on receipt_hash, but the receipt hash does NOT depend on the
+    # manifest hash. The manifest_hash field in the receipt is informational
+    # only (it links the receipt to the manifest, but isn't part of the
+    # receipt's own hash).
+    #
+    # Verification: recompute receipt hash from the same subset, check it
+    # matches receipt["receipt_hash"], then check manifest["receipt_hash"]
+    # matches receipt["receipt_hash"]. Any receipt replacement breaks the
+    # manifest hash and thus the owner Ed25519 signature.
     receipt = {
         "schema": RECEIPT_SCHEMA,
         "event": "capsule_sealed",
@@ -362,11 +369,27 @@ def seal_capsule(workspace: Path, capsule_dir: Path, owner_priv: bytes, owner_pu
         "epoch": 1,
         "source_host_label": "host-a-local-mac",
         "source_host_platform": platform.platform(),
-        "manifest_hash": manifest["manifest_hash"],
+        "manifest_hash": "",  # filled after manifest hash is known
         "workspace_root_hash": workspace_manifest["root_hash"],
         "timestamp": time.time(),
     }
-    receipt["receipt_hash"] = sha256_bytes(canonical_json({k: v for k, v in receipt.items() if k != "receipt_hash"}))
+    # Receipt hash over stable subset (no manifest_hash, no receipt_hash)
+    receipt["receipt_hash"] = sha256_bytes(canonical_json(
+        {k: v for k, v in receipt.items() if k != "receipt_hash" and k != "manifest_hash"}
+    ))
+
+    # Bind receipt_hash into manifest, compute manifest hash
+    manifest["receipt_hash"] = receipt["receipt_hash"]
+    signing_content = {k: v for k, v in manifest.items() if k not in ("manifest_hash", "owner_signature")}
+    manifest["manifest_hash"] = sha256_bytes(canonical_json(signing_content))
+
+    # Fill in the manifest_hash in the receipt (informational linkage)
+    receipt["manifest_hash"] = manifest["manifest_hash"]
+
+    # Sign the manifest hash
+    manifest["owner_signature"] = sign_message(owner_priv, manifest["manifest_hash"].encode()).hex()
+
+    (capsule_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
     (capsule_dir / "receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True))
 
     return manifest

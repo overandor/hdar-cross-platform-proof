@@ -173,10 +173,15 @@ def verify_capsule(capsule_dir: Path, owner_pub_hex: str) -> dict:
     else:
         problems.append("no owner signature in manifest")
 
-    # Verify receipt
+    # Verify receipt (try both old and new hash methods for backward compat)
     receipt = json.loads((capsule_dir / "receipt.json").read_text())
-    receipt_expected = sha256_bytes(canonical_json({k: v for k, v in receipt.items() if k != "receipt_hash"}))
-    if receipt_expected != receipt.get("receipt_hash"):
+    receipt_expected_new = sha256_bytes(canonical_json(
+        {k: v for k, v in receipt.items() if k != "receipt_hash" and k != "manifest_hash"}
+    ))
+    receipt_expected_old = sha256_bytes(canonical_json(
+        {k: v for k, v in receipt.items() if k != "receipt_hash"}
+    ))
+    if receipt_expected_new != receipt.get("receipt_hash") and receipt_expected_old != receipt.get("receipt_hash"):
         problems.append("receipt hash mismatch")
 
     return {
@@ -274,16 +279,11 @@ def seal_epoch_2(
     if host_b_pub is not None:
         manifest["host_b_public_key"] = host_b_pub.hex()
 
-    signing_content = {k: v for k, v in manifest.items() if k not in ("manifest_hash", "host_b_signature")}
-    manifest["manifest_hash"] = sha256_bytes(canonical_json(signing_content))
-
-    # Host B signs the manifest hash
-    if host_b_priv is not None and host_b_pub is not None:
-        signature = sign_message(host_b_priv, manifest["manifest_hash"].encode())
-        manifest["host_b_signature"] = signature.hex()
-
-    (capsule_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
-
+    # Bind the receipt hash into the manifest (audit defect 6: receipts were
+    # self-hashed only, not anchored into the signed manifest).
+    # Receipt hash is computed over a stable subset (excluding manifest_hash
+    # and receipt_hash) to avoid circular dependency. See host_a_seal.py for
+    # the full explanation.
     receipt = {
         "schema": RECEIPT_SCHEMA,
         "event": "capsule_sealed_after_host_b_continuation",
@@ -291,13 +291,30 @@ def seal_epoch_2(
         "epoch": epoch,
         "source_host_label": host_label,
         "source_host_platform": platform.platform(),
-        "manifest_hash": manifest["manifest_hash"],
+        "manifest_hash": "",  # filled after manifest hash is known
         "workspace_root_hash": workspace_manifest["root_hash"],
         "timestamp": time.time(),
     }
     if host_b_pub is not None:
         receipt["host_b_public_key"] = host_b_pub.hex()
-    receipt["receipt_hash"] = sha256_bytes(canonical_json({k: v for k, v in receipt.items() if k != "receipt_hash"}))
+    receipt["receipt_hash"] = sha256_bytes(canonical_json(
+        {k: v for k, v in receipt.items() if k != "receipt_hash" and k != "manifest_hash"}
+    ))
+
+    # Bind receipt_hash into manifest, compute manifest hash
+    manifest["receipt_hash"] = receipt["receipt_hash"]
+    signing_content = {k: v for k, v in manifest.items() if k not in ("manifest_hash", "host_b_signature")}
+    manifest["manifest_hash"] = sha256_bytes(canonical_json(signing_content))
+
+    # Fill in manifest_hash in receipt (informational linkage)
+    receipt["manifest_hash"] = manifest["manifest_hash"]
+
+    # Host B signs the manifest hash
+    if host_b_priv is not None and host_b_pub is not None:
+        signature = sign_message(host_b_priv, manifest["manifest_hash"].encode())
+        manifest["host_b_signature"] = signature.hex()
+
+    (capsule_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
     (capsule_dir / "receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True))
 
     return manifest

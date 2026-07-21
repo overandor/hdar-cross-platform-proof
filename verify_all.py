@@ -118,8 +118,28 @@ def verify_single_host_b(
     check("E1 Ed25519 owner signature valid", e1_sig_ok)
 
     # 3. E1 receipt hash valid
-    e1_r_expected = sha256_bytes(canonical_json({k: v for k, v in e1_receipt.items() if k != "receipt_hash"}))
-    check("E1 receipt hash valid", e1_r_expected == e1_receipt["receipt_hash"])
+    #    New evidence: receipt hash computed over subset excluding manifest_hash
+    #    and receipt_hash (to avoid circular dependency with manifest binding).
+    #    Old evidence: receipt hash computed over all fields except receipt_hash.
+    #    Try both methods for backward compatibility.
+    e1_r_expected_new = sha256_bytes(canonical_json(
+        {k: v for k, v in e1_receipt.items() if k != "receipt_hash" and k != "manifest_hash"}
+    ))
+    e1_r_expected_old = sha256_bytes(canonical_json(
+        {k: v for k, v in e1_receipt.items() if k != "receipt_hash"}
+    ))
+    e1_r_valid = e1_r_expected_new == e1_receipt["receipt_hash"] or e1_r_expected_old == e1_receipt["receipt_hash"]
+    check("E1 receipt hash valid", e1_r_valid)
+
+    # 3b. E1 receipt bound into manifest (audit defect 6)
+    #     New evidence includes receipt_hash in the manifest; old evidence doesn't.
+    if "receipt_hash" in e1_manifest:
+        check("E1 receipt hash bound into manifest",
+              e1_manifest["receipt_hash"] == e1_receipt["receipt_hash"],
+              f"manifest={e1_manifest['receipt_hash'][:16]}... receipt={e1_receipt['receipt_hash'][:16]}...")
+    else:
+        # Old evidence — receipt not bound, skip silently
+        pass
 
     # 4. E2 manifest hash valid
     #    The sealer excludes both manifest_hash and host_b_signature from the
@@ -131,8 +151,24 @@ def verify_single_host_b(
           f"expected={e2_expected[:16]}... actual={e2_manifest['manifest_hash'][:16]}...")
 
     # 5. E2 receipt hash valid
-    e2_r_expected = sha256_bytes(canonical_json({k: v for k, v in e2_receipt.items() if k != "receipt_hash"}))
-    check("E2 receipt hash valid", e2_r_expected == e2_receipt["receipt_hash"])
+    #    Same backward-compatible approach as E1 receipt (try both methods).
+    e2_r_expected_new = sha256_bytes(canonical_json(
+        {k: v for k, v in e2_receipt.items() if k != "receipt_hash" and k != "manifest_hash"}
+    ))
+    e2_r_expected_old = sha256_bytes(canonical_json(
+        {k: v for k, v in e2_receipt.items() if k != "receipt_hash"}
+    ))
+    e2_r_valid = e2_r_expected_new == e2_receipt["receipt_hash"] or e2_r_expected_old == e2_receipt["receipt_hash"]
+    check("E2 receipt hash valid", e2_r_valid)
+
+    # 5b. E2 receipt bound into manifest (audit defect 6)
+    if "receipt_hash" in e2_manifest:
+        check("E2 receipt hash bound into manifest",
+              e2_manifest["receipt_hash"] == e2_receipt["receipt_hash"],
+              f"manifest={e2_manifest['receipt_hash'][:16]}... receipt={e2_receipt['receipt_hash'][:16]}...")
+    else:
+        # Old evidence — receipt not bound, skip silently
+        pass
 
     # 6. Cryptographic lineage: E2.parent_manifest_hash == E1.manifest_hash
     check("Cryptographic lineage E1→E2",
