@@ -2,7 +2,7 @@
 
 ## Summary
 
-**4 recorded Host B runtime configurations. 80/80 verifier checks passed. 4/4 platform separations confirmed. Pipeline output hash identical across all platforms.**
+**4 recorded Host B runtime configurations. 84/84 verifier checks passed. 4/4 platform separations confirmed. Pipeline output hash identical across all platforms.**
 
 Each published Host B execution occurred outside Host A; the three GitHub Actions jobs ran on separately provisioned hosted VMs, and the Codespaces execution ran in a development container hosted on a VM. The Ed25519 owner signature was verified on each platform. The deterministic pipeline produced byte-identical output on all 4 configurations.
 
@@ -49,16 +49,16 @@ This proves the 5-stage pipeline (parse → filter → aggregate → classify �
 ## Verifier Results
 
 ```
-codespaces-linux               20/20 checks  [ALL PASS]
-github-actions-ubuntu-22.04    20/20 checks  [ALL PASS]
-github-actions-ubuntu-24.04    20/20 checks  [ALL PASS]
-github-actions-macos-14        20/20 checks  [ALL PASS]
+codespaces-linux               21/21 checks  [ALL PASS]
+github-actions-ubuntu-22.04    21/21 checks  [ALL PASS]
+github-actions-ubuntu-24.04    21/21 checks  [ALL PASS]
+github-actions-macos-14        21/21 checks  [ALL PASS]
 
 Platform separations confirmed: 4/4
 Overall verdict: ALL CHECKS PASSED
 ```
 
-### 20 checks per Host B report:
+### 21 checks per Host B report:
 
 1. E1 manifest hash valid
 2. E1 Ed25519 owner signature valid
@@ -74,12 +74,13 @@ Overall verdict: ALL CHECKS PASSED
 12. E2 receipt workspace hash matches manifest
 13. E2 workspace differs from E1
 14. E2 workspace grew
-15. Shared workspace files preserved
+15. Source workspace files preserved (identical hash, size, mode)
 16. Host B nonce present (consistent with runtime generation; supports replay detection when bound to independently authenticated execution provenance)
 17. Host B UTC timestamps present
 18. Host B hostname present
-19. Pipeline output hash in report
+19. Pipeline output hash recomputed from E2 workspace (not just checked in report)
 20. E2 content blocks all valid
+21. Source-commit binding + generated embedded runner hash matches
 
 ## What Makes This Real (Not Theater)
 
@@ -130,7 +131,7 @@ This runs Host B on Ubuntu 22.04, Ubuntu 24.04, and macOS 14 simultaneously, pro
 
 ```
 evidence/
-├── final_verifier_report.json          # Combined verifier report (80/80 passed)
+├── final_verifier_report.json          # Combined verifier report (84/84 passed)
 ├── codespaces/
 │   ├── host_b_report.json              # Codespaces Linux report
 │   ├── verifier_report.json            # Single-platform verifier report

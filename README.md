@@ -4,7 +4,7 @@ Host-Detached Archival Runtime — cryptographic proof that an agent workspace c
 
 ## Status
 
-**80/80 verifier checks passed. 4/4 platform separations confirmed.**
+**84/84 verifier checks passed. 4/4 platform separations confirmed.**
 
 Host A sealed Epoch 1 on macOS (this Mac). Host B ran on 4 recorded Host B runtime configurations, including one Codespaces environment and three separately provisioned GitHub Actions jobs:
 - GitHub Codespaces (Linux 6.8.0, Azure x86_64)
@@ -25,29 +25,30 @@ pip install cryptography
 python3 prove.py
 ```
 
-This runs 20 checks per platform (80 total) against the published evidence. All artifacts are in the repo — no network access to remote platforms needed.
+This runs 21 checks per platform (84 total) against the published evidence. All artifacts are in the repo — no network access to remote platforms needed.
 
-## What the Verifier Checks (20 per platform)
+## What the Verifier Checks (21 per platform)
 
 | # | Check | What it proves |
 |---|---|---|
 | 1 | E1 manifest hash valid | Capsule not tampered in transit |
 | 2 | E1 Ed25519 owner signature valid | Host A identity authenticated |
-| 3 | E1 receipt hash valid | Sealing event not forged |
+| 3 | E1 receipt hash valid | Receipt is internally consistent and unmodified relative to the capsule |
 | 4 | E2 manifest hash valid | Host B capsule not tampered |
-| 5 | E2 receipt hash valid | Host B sealing event not forged |
+| 5 | E2 receipt hash valid | Receipt is internally consistent and unmodified; Host B origin authentication remains pending |
 | 6 | Cryptographic lineage E1→E2 | E2 descends from E1 (linked list of hashes) |
 | 7 | Epoch advancement 1→2 | Continuation happened |
-| 8 | Platform separation | Host A and Host B are different machines |
+| 8 | Platform separation | Platform difference verified against Host B-reported environment metadata; externally authenticated runner provenance remains pending |
 | 9 | Owner public key consistent | Same owner across epochs |
 | 10 | Host B confirms platform separation | Host B self-reports different platform |
-| 11-12 | Receipt workspace hashes match manifests | Receipts not forged |
+| 11-12 | Receipt workspace hashes match manifests | Receipts internally consistent |
 | 13 | E2 workspace differs from E1 | Work continued (state changed) |
 | 14 | E2 workspace grew | Pipeline produced output |
-| 15 | Shared workspace files preserved | Original files not corrupted |
+| 15 | Source workspace files preserved | All source files preserved with identical hash, size, and mode |
 | 16-18 | Host B nonce/timestamps/hostname | Consistent with runtime generation; support replay detection when bound to independently authenticated execution provenance |
-| 19 | Pipeline output hash in report | Deterministic computation verified |
+| 19 | Pipeline output hash recomputed from E2 | Deterministic computation verified by recomputing from E2 content blocks, not just checking the report field |
 | 20 | E2 content blocks all valid | No bit rot in E2 capsule |
+| 21 | Source-commit binding + generated runner hash | Evidence bound to specific commit and embedded runner |
 
 ## Honest Claim Boundary
 
