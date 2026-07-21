@@ -7,7 +7,7 @@ Host-Detached Archival Runtime — cryptographic proof that an agent workspace c
 **84/84 verifier checks passed. 4/4 platform separations confirmed.**
 
 Host A sealed Epoch 1 on macOS (this Mac). Host B ran on 4 recorded Host B runtime configurations, including one Codespaces environment and three separately provisioned GitHub Actions jobs:
-- GitHub Codespaces (Linux 6.8.0, Azure x86_64)
+- GitHub Codespaces (Linux 6.8.0, x86_64)
 - GitHub Actions Ubuntu 22.04 (Linux x86_64)
 - GitHub Actions Ubuntu 24.04 (Linux x86_64)
 - GitHub Actions macOS 14 (arm64, separately provisioned runner)
@@ -79,7 +79,7 @@ This repo proves:
 This repo does NOT prove:
 - That the pipeline is useful (it's a 5-stage JSONL analysis — toy task)
 - That an AI agent's cognitive state is preserved (only files are preserved)
-- That the verifier is independent (it shares Python with the sealer, though it re-implements all checks from the capsule format spec)
+- That the verifier is implementation-independent (the Python verifier shares Python with the sealer, but an independent Rust verifier now also exists and both must pass — see `rust_verifier/`)
 - That the system is secure against a determined attacker (the private key is in `.gitignore` but was on the same machine as the verifier)
 - That Host B origin is cryptographically authenticated (platform strings, nonces, and timestamps are Host-B-reported fields inside the report, not external proof of the report's origin; see `TRUST_BOUNDARY.md`)
 - That the Host B executions occurred on four independent cloud providers (the published evidence establishes Codespaces plus GitHub-hosted Actions infrastructure, not four independent providers)

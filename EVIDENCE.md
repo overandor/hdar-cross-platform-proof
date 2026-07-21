@@ -4,9 +4,9 @@
 
 **4 recorded Host B runtime configurations. 84/84 verifier checks passed. 4/4 platform separations confirmed. Pipeline output hash identical across all platforms.**
 
-Each published Host B execution occurred outside Host A; the three GitHub Actions jobs ran on separately provisioned hosted VMs, and the Codespaces execution ran in a development container hosted on a VM. The Ed25519 owner signature was verified on each platform. The deterministic pipeline produced byte-identical output on all 4 configurations.
+Each published Host B execution occurred outside Host A; the three GitHub Actions jobs ran on separately provisioned GitHub-hosted runners, and the Codespaces execution ran in a development container hosted on a VM. The Ed25519 owner signature was verified on each platform. The deterministic pipeline produced byte-identical output on all 4 configurations.
 
-The published evidence establishes Codespaces plus GitHub-hosted Actions infrastructure, not four independent cloud providers. Externally authenticated Host B provenance remains pending — see `TRUST_BOUNDARY.md`.
+The published evidence establishes four recorded Host B runtime configurations across one Codespaces environment and three separately provisioned GitHub-hosted Actions jobs — not four independent cloud providers. Externally authenticated Host B provenance remains pending — see `TRUST_BOUNDARY.md`.
 
 ## Host A (Sealing)
 
@@ -44,7 +44,7 @@ This proves the 5-stage pipeline (parse → filter → aggregate → classify �
 - macOS arm64 vs Linux x86_64
 - Python 3.12 vs 3.13
 - Different glibc versions (2.35 vs 2.39)
-- Codespaces (Azure Linux VM) vs GitHub Actions runners (separately provisioned hosted VMs)
+- Codespaces (development container on a hosted VM) vs GitHub Actions runners (separately provisioned GitHub-hosted jobs)
 
 ## Verifier Results
 
@@ -85,7 +85,7 @@ Overall verdict: ALL CHECKS PASSED
 ## What Makes This Real (Not Theater)
 
 1. **Host A is this Mac.** Private key generated here, never transmitted.
-2. **Host B runs on real remote machines.** Codespaces is an Azure Linux VM. GitHub Actions runners are separately provisioned hosted VMs.
+2. **Host B runs on real remote machines.** Codespaces is a development container hosted on a VM. GitHub Actions runners are separately provisioned GitHub-hosted jobs.
 3. **The capsule crossed an untrusted channel.** It was embedded in a Python script, pushed to GitHub, cloned on each remote machine. Any tampering would break the SHA-256 or Ed25519 signature.
 4. **Platform separation is verified against Host B-reported metadata, not externally authenticated.** The verifier checks that `platform.platform()` differs between Host A and each Host B. All 4 passed. Externally authenticated runner provenance remains pending.
 5. **Each Host B report has fresh nonces and UTC timestamps.** These are consistent with runtime generation and support replay detection when bound to independently authenticated execution provenance. A self-generated nonce proves only that the program generated some value; it becomes meaningful replay evidence when bound to an externally issued challenge, an attested workflow execution, a signed Host B identity, or a transparency-log entry.
@@ -154,6 +154,6 @@ The HDAR protocol is proven to work across platforms. The capsule is content-add
 
 The strongest claim that survives scrutiny:
 
-> **HDAR demonstrates that an owner-signed, content-addressed workspace can be transported to separately provisioned heterogeneous runtimes, restored byte-exactly, deterministically advanced through a bounded task, and resealed into a cryptographically linked successor epoch. The current proof authenticates Host A and artifact lineage; externally attested Host B provenance, adversarial-host resistance, and implementation-independent verification remain open validation boundaries.**
+> **HDAR demonstrates that an owner-signed, content-addressed workspace can be transported to separately provisioned heterogeneous runtimes, restored byte-exactly, deterministically advanced through a bounded task, and resealed into a cryptographically linked successor epoch. The current protocol authenticates Host A and capsule lineage, while provider-backed Host B provenance, adversarial-host resistance, and independent verifier diversity remain open validation boundaries.**
 
 The next category-changing result is not another ten self-authored checks. It is a fresh current-commit workflow producing GitHub artifact attestations, Host B-signed reports, challenge-bound nonces, and verification by an independently written Rust or Go implementation. See `TRUST_BOUNDARY.md` for the open boundaries and the attestation roadmap.
