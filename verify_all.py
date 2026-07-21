@@ -141,6 +141,22 @@ def verify_single_host_b(
         # Old evidence — receipt not bound, skip silently
         pass
 
+    # 3c. E1 environment manifest bound into signed manifest (audit defect 7)
+    if "environment_manifest_hash" in e1_manifest:
+        e1_env_path = host_a_dir / "capsule_epoch_1" / "environment_manifest.json"
+        if e1_env_path.exists():
+            e1_env = json.loads(e1_env_path.read_text())
+            e1_env_expected = sha256_bytes(canonical_json(e1_env))
+            check("E1 environment manifest hash matches binding",
+                  e1_env_expected == e1_manifest["environment_manifest_hash"],
+                  f"expected={e1_env_expected[:16]}... actual={e1_manifest['environment_manifest_hash'][:16]}...")
+        else:
+            check("E1 environment manifest hash matches binding",
+                  False, "environment_manifest.json missing from E1 capsule")
+    else:
+        # Old evidence — environment manifest not bound, skip silently
+        pass
+
     # 4. E2 manifest hash valid
     #    The sealer excludes both manifest_hash and host_b_signature from the
     #    signing content. The verifier must match.
@@ -168,6 +184,22 @@ def verify_single_host_b(
               f"manifest={e2_manifest['receipt_hash'][:16]}... receipt={e2_receipt['receipt_hash'][:16]}...")
     else:
         # Old evidence — receipt not bound, skip silently
+        pass
+
+    # 5c. E2 environment manifest bound into signed manifest (audit defect 7)
+    if "host_b_environment_manifest_hash" in e2_manifest:
+        e2_env_path = e2_capsule_dir / "environment_manifest.json"
+        if e2_env_path.exists():
+            e2_env = json.loads(e2_env_path.read_text())
+            e2_env_expected = sha256_bytes(canonical_json(e2_env))
+            check("E2 environment manifest hash matches binding",
+                  e2_env_expected == e2_manifest["host_b_environment_manifest_hash"],
+                  f"expected={e2_env_expected[:16]}... actual={e2_manifest['host_b_environment_manifest_hash'][:16]}...")
+        else:
+            check("E2 environment manifest hash matches binding",
+                  False, "environment_manifest.json missing from E2 capsule")
+    else:
+        # Old evidence — environment manifest not bound, skip silently
         pass
 
     # 6. Cryptographic lineage: E2.parent_manifest_hash == E1.manifest_hash

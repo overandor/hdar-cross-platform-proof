@@ -261,6 +261,26 @@ def seal_epoch_2(
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
 
+    # Generate Host B environment manifest and bind its hash into E2
+    # (audit defect 7: environment manifest was not evidence-bound)
+    import subprocess as _sp
+    def _pip_freeze() -> list[str]:
+        try:
+            r = _sp.run([sys.executable, "-m", "pip", "freeze"], capture_output=True, text=True, timeout=10)
+            return r.stdout.strip().split("\n") if r.returncode == 0 else []
+        except Exception:
+            return []
+    host_b_env_manifest = {
+        "python_version": sys.version,
+        "platform": platform.platform(),
+        "processor": platform.processor(),
+        "machine": platform.machine(),
+        "os_uname": list(platform.uname()),
+        "hostname": platform.node(),
+        "installed_packages": _pip_freeze(),
+    }
+    host_b_env_manifest_hash = sha256_bytes(canonical_json(host_b_env_manifest))
+
     manifest = {
         "schema": SCHEMA,
         "protocol_version": PROTOCOL_VERSION,
@@ -273,6 +293,7 @@ def seal_epoch_2(
         "objective": "Cross-platform HDAR continuation proof — Epoch 2 sealed by Host B",
         "continuation_point": f"Host B ({host_label}) restored E1, executed pipeline, updated agent state, sealed E2.",
         "workspace_manifest": workspace_manifest,
+        "host_b_environment_manifest_hash": host_b_env_manifest_hash,
     }
     if challenge_nonce:
         manifest["challenge_nonce"] = challenge_nonce
@@ -316,6 +337,10 @@ def seal_epoch_2(
 
     (capsule_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
     (capsule_dir / "receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True))
+    # Write Host B environment manifest alongside the E2 capsule
+    (capsule_dir / "environment_manifest.json").write_text(
+        json.dumps(host_b_env_manifest, indent=2, sort_keys=True) + "\n"
+    )
 
     return manifest
 

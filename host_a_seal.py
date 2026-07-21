@@ -63,6 +63,37 @@ def canonical_json(data: dict) -> bytes:
     return json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
 
 
+def get_environment_manifest() -> dict:
+    """Capture Host A environment for evidence binding into E1 manifest.
+
+    Audit defect 7: the environment manifest was written as a standalone file
+    but not included in E1's signed material, not referenced by E2, and not
+    inspected by verify_all.py. This function generates the manifest and
+    seal_capsule() binds its hash into the E1 manifest's signed content.
+    """
+    import subprocess as _sp
+
+    def _pip_freeze() -> list[str]:
+        try:
+            r = _sp.run([sys.executable, "-m", "pip", "freeze"], capture_output=True, text=True, timeout=10)
+            return r.stdout.strip().split("\n") if r.returncode == 0 else []
+        except Exception:
+            return []
+
+    packages = _pip_freeze()
+    return {
+        "python_version": sys.version,
+        "platform": platform.platform(),
+        "processor": platform.processor(),
+        "machine": platform.machine(),
+        "os_uname": list(platform.uname()),
+        "locale": os.environ.get("LANG", os.environ.get("LC_ALL", "")),
+        "timezone": time.tzname[0] if time.tzname else "",
+        "installed_packages": packages,
+        "package_count": len(packages),
+    }
+
+
 def get_source_commit_binding() -> dict:
     """Bind evidence packet to a specific Git commit and canonical file hashes."""
     import subprocess as _sp
@@ -332,6 +363,11 @@ def seal_capsule(workspace: Path, capsule_dir: Path, owner_priv: bytes, owner_pu
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
 
+    # Generate environment manifest and bind its hash into the E1 manifest
+    # (audit defect 7: environment manifest was not evidence-bound)
+    env_manifest = get_environment_manifest()
+    env_manifest_hash = sha256_bytes(canonical_json(env_manifest))
+
     manifest = {
         "schema": SCHEMA,
         "protocol_version": PROTOCOL_VERSION,
@@ -346,6 +382,7 @@ def seal_capsule(workspace: Path, capsule_dir: Path, owner_priv: bytes, owner_pu
         "workspace_manifest": workspace_manifest,
         "owner_public_key": owner_pub.hex(),
         "owner_signature_algorithm": "ed25519",
+        "environment_manifest_hash": env_manifest_hash,
     }
 
     # Bind the receipt hash into the manifest (audit defect 6: receipts were
@@ -391,6 +428,11 @@ def seal_capsule(workspace: Path, capsule_dir: Path, owner_priv: bytes, owner_pu
 
     (capsule_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
     (capsule_dir / "receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True))
+    # Write environment manifest alongside the capsule so the verifier can
+    # recompute its hash and confirm it matches the binding in the manifest
+    (capsule_dir / "environment_manifest.json").write_text(
+        json.dumps(env_manifest, indent=2, sort_keys=True) + "\n"
+    )
 
     return manifest
 
