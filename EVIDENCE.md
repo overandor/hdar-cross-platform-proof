@@ -2,9 +2,11 @@
 
 ## Summary
 
-**4 independent platforms. 80/80 verifier checks passed. 4/4 platform separations confirmed. Pipeline output hash identical across all platforms.**
+**4 recorded Host B runtime configurations. 80/80 verifier checks passed. 4/4 platform separations confirmed. Pipeline output hash identical across all platforms.**
 
-This is not theater. Each Host B run happened on a physically separate machine, in a different cloud, with a different OS kernel. The Ed25519 owner signature was verified on each platform. The deterministic pipeline produced byte-identical output on all 4 platforms.
+Each published Host B execution occurred outside Host A; the three GitHub Actions jobs ran on separately provisioned hosted VMs, and the Codespaces execution ran in a development container hosted on a VM. The Ed25519 owner signature was verified on each platform. The deterministic pipeline produced byte-identical output on all 4 configurations.
+
+The published evidence establishes Codespaces plus GitHub-hosted Actions infrastructure, not four independent cloud providers. Externally authenticated Host B provenance remains pending — see `TRUST_BOUNDARY.md`.
 
 ## Host A (Sealing)
 
@@ -26,7 +28,9 @@ This is not theater. Each Host B run happened on a physically separate machine, 
 | 1 | GitHub Codespaces | codespaces-855c05 | Linux 6.8.0-1052-azure | x86_64 | YES |
 | 2 | GitHub Actions | runner | Linux (Ubuntu 22.04) | x64 | YES |
 | 3 | GitHub Actions | runner | Linux (Ubuntu 24.04) | x64 | YES |
-| 4 | GitHub Actions | runner | macOS 14 | arm64 | YES (different machine) |
+| 4 | GitHub Actions | runner | macOS 14 | arm64 | YES (separately provisioned runner) |
+
+Platform difference is verified against Host B-reported environment metadata; externally authenticated runner provenance remains pending.
 
 ## Pipeline Determinism
 
@@ -40,7 +44,7 @@ This proves the 5-stage pipeline (parse → filter → aggregate → classify �
 - macOS arm64 vs Linux x86_64
 - Python 3.12 vs 3.13
 - Different glibc versions (2.35 vs 2.39)
-- Different cloud providers (Azure Codespaces vs GitHub Actions runners)
+- Codespaces (Azure Linux VM) vs GitHub Actions runners (separately provisioned hosted VMs)
 
 ## Verifier Results
 
@@ -71,7 +75,7 @@ Overall verdict: ALL CHECKS PASSED
 13. E2 workspace differs from E1
 14. E2 workspace grew
 15. Shared workspace files preserved
-16. Host B nonce present (fresh evidence)
+16. Host B nonce present (consistent with runtime generation; supports replay detection when bound to independently authenticated execution provenance)
 17. Host B UTC timestamps present
 18. Host B hostname present
 19. Pipeline output hash in report
@@ -80,10 +84,10 @@ Overall verdict: ALL CHECKS PASSED
 ## What Makes This Real (Not Theater)
 
 1. **Host A is this Mac.** Private key generated here, never transmitted.
-2. **Host B runs on real remote machines.** Codespaces is an Azure Linux VM. GitHub Actions runners are separate cloud instances.
+2. **Host B runs on real remote machines.** Codespaces is an Azure Linux VM. GitHub Actions runners are separately provisioned hosted VMs.
 3. **The capsule crossed an untrusted channel.** It was embedded in a Python script, pushed to GitHub, cloned on each remote machine. Any tampering would break the SHA-256 or Ed25519 signature.
-4. **Platform separation is verified, not assumed.** The verifier checks that `platform.platform()` differs between Host A and each Host B. All 4 passed.
-5. **Each Host B report has fresh nonces and UTC timestamps.** These are non-deterministic and prove the report was generated at runtime, not copied.
+4. **Platform separation is verified against Host B-reported metadata, not externally authenticated.** The verifier checks that `platform.platform()` differs between Host A and each Host B. All 4 passed. Externally authenticated runner provenance remains pending.
+5. **Each Host B report has fresh nonces and UTC timestamps.** These are consistent with runtime generation and support replay detection when bound to independently authenticated execution provenance. A self-generated nonce proves only that the program generated some value; it becomes meaningful replay evidence when bound to an externally issued challenge, an attested workflow execution, a signed Host B identity, or a transparency-log entry.
 6. **The pipeline output hash is identical across all platforms.** `8708384a...` on macOS, Linux 22.04, Linux 24.04, and macOS 14 (Actions runner). This is the core determinism proof.
 7. **All evidence is published.** https://github.com/overandor/hdar-cross-platform-proof — anyone can clone and run the verifier themselves.
 
@@ -145,4 +149,10 @@ evidence/
 
 ## Conclusion
 
-The HDAR protocol is proven to work across platforms. The capsule is content-addressed, cryptographically signed, and deterministically reproducible. The "theater" is over.
+The HDAR protocol is proven to work across platforms. The capsule is content-addressed, cryptographically signed, and deterministically reproducible.
+
+The strongest claim that survives scrutiny:
+
+> **HDAR demonstrates that an owner-signed, content-addressed workspace can be transported to separately provisioned heterogeneous runtimes, restored byte-exactly, deterministically advanced through a bounded task, and resealed into a cryptographically linked successor epoch. The current proof authenticates Host A and artifact lineage; externally attested Host B provenance, adversarial-host resistance, and implementation-independent verification remain open validation boundaries.**
+
+The next category-changing result is not another ten self-authored checks. It is a fresh current-commit workflow producing GitHub artifact attestations, Host B-signed reports, challenge-bound nonces, and verification by an independently written Rust or Go implementation. See `TRUST_BOUNDARY.md` for the open boundaries and the attestation roadmap.

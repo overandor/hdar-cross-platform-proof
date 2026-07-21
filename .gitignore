@@ -6,3 +6,7 @@ host_b_output/
 e2b_output/
 *.tar.gz
 owner_private_key.txt
+*-snapshot.txt
+release_bundle/
+wheels/
+

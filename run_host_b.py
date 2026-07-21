@@ -210,7 +210,16 @@ def safe_extract_tar(tf: tarfile.TarFile, dest: Path) -> None:
         tf.extractall(dest)
 
 
-def seal_epoch_2(workspace: Path, capsule_dir: Path, epoch: int, parent_manifest_hash: str, host_label: str) -> dict:
+def seal_epoch_2(
+    workspace: Path,
+    capsule_dir: Path,
+    epoch: int,
+    parent_manifest_hash: str,
+    host_label: str,
+    host_b_priv: bytes | None = None,
+    host_b_pub: bytes | None = None,
+    challenge_nonce: str = "",
+) -> dict:
     capsule_dir.mkdir(parents=True, exist_ok=True)
     blocks_dir = capsule_dir / "blocks"
     blocks_dir.mkdir(parents=True, exist_ok=True)
@@ -234,11 +243,21 @@ def seal_epoch_2(workspace: Path, capsule_dir: Path, epoch: int, parent_manifest
         "source_host_label": host_label,
         "source_host_platform": platform.platform(),
         "objective": "Cross-platform HDAR continuation proof — Epoch 2 sealed by Host B",
-        "continuation_point": f"Host B ({host_label}) restored E1, executed pipeline, sealed E2.",
+        "continuation_point": f"Host B ({host_label}) restored E1, executed pipeline, updated agent state, sealed E2.",
         "workspace_manifest": workspace_manifest,
     }
-    signing_content = {k: v for k, v in manifest.items() if k not in ("manifest_hash",)}
+    if challenge_nonce:
+        manifest["challenge_nonce"] = challenge_nonce
+    if host_b_pub is not None:
+        manifest["host_b_public_key"] = host_b_pub.hex()
+
+    signing_content = {k: v for k, v in manifest.items() if k not in ("manifest_hash", "host_b_signature")}
     manifest["manifest_hash"] = sha256_bytes(canonical_json(signing_content))
+
+    # Host B signs the manifest hash
+    if host_b_priv is not None and host_b_pub is not None:
+        signature = sign_message(host_b_priv, manifest["manifest_hash"].encode())
+        manifest["host_b_signature"] = signature.hex()
 
     (capsule_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
 
@@ -253,6 +272,8 @@ def seal_epoch_2(workspace: Path, capsule_dir: Path, epoch: int, parent_manifest
         "workspace_root_hash": workspace_manifest["root_hash"],
         "timestamp": time.time(),
     }
+    if host_b_pub is not None:
+        receipt["host_b_public_key"] = host_b_pub.hex()
     receipt["receipt_hash"] = sha256_bytes(canonical_json({k: v for k, v in receipt.items() if k != "receipt_hash"}))
     (capsule_dir / "receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True))
 
@@ -302,6 +323,7 @@ def main() -> int:
     ap.add_argument("--out", default="./host_b_output", help="Output directory")
     ap.add_argument("--host-label", default="", help="Label for this host (auto-detected if empty)")
     ap.add_argument("--operator", default="", help="Operator identity (optional)")
+    ap.add_argument("--challenge-nonce", default="", help="Verifier-issued challenge nonce (optional, for challenge-response freshness)")
     args = ap.parse_args()
 
     if not EMBEDDED_CAPSULE_B64:
@@ -396,17 +418,69 @@ def main() -> int:
     for stage in task_result["stage_chain"]:
         print(f"    {stage['stage']}: {stage['hash'][:16]}...")
 
-    # 6. Seal Epoch 2
+    # 5b. Update agent state to reflect completion (semantic continuation)
+    print("\n[5b/6] Updating agent state for Epoch 2...")
+    agent_state_path = restored_workspace / "agent_state.json"
+    agent_state = json.loads(agent_state_path.read_text())
+    agent_state["epoch"] = 2
+    agent_state["task_completed"] = True
+    agent_state["status"] = "completed_on_host_b"
+    agent_state["previous_manifest_hash"] = verification["manifest_hash"]
+    agent_state["completed_at_utc"] = utc_now_iso()
+    agent_state["completed_on_platform"] = platform.platform()
+    agent_state["next_action"] = "Epoch 3: Transfer E2 to next host or verify lineage."
+    agent_state_path.write_text(json.dumps(agent_state, indent=2, sort_keys=True) + "\n")
+    print(f"  agent_state.epoch = {agent_state['epoch']}")
+    print(f"  agent_state.task_completed = {agent_state['task_completed']}")
+    print(f"  agent_state.status = {agent_state['status']}")
+
+    # 5c. Update todo.md to mark Epoch 2 work complete
+    todo_path = restored_workspace / "todo.md"
+    todo_path.write_text(
+        "# HDAR Task List\n\n"
+        "## Epoch 1 (Host A)\n"
+        "- [x] Create workspace\n"
+        "- [x] Seal capsule\n\n"
+        "## Epoch 2 (Host B)\n"
+        "- [x] Execute pipeline\n"
+        "- [x] Seal successor\n"
+        "- [x] Update agent state\n\n"
+        "## Epoch 3 (Next Host)\n"
+        "- [ ] Restore E2 capsule\n"
+        "- [ ] Continue work\n"
+    )
+    print(f"  todo.md updated: Epoch 2 marked complete")
+
+    # 5d. Append to progress.log
+    progress_path = restored_workspace / "progress.log"
+    with progress_path.open("a") as f:
+        f.write(json.dumps({
+            "event": "completed_on_host_b",
+            "host": host_label,
+            "platform": platform.platform(),
+            "timestamp": time.time(),
+            "epoch": 2,
+            "pipeline_output_hash": task_result["output_hash"],
+        }, sort_keys=True) + "\n")
+
+    # 6. Seal Epoch 2 (with Host B ephemeral signing)
     print("\n[6/6] Sealing Epoch 2 successor capsule...")
     capsule_epoch_2 = out_dir / "capsule_epoch_2"
     if capsule_epoch_2.exists():
         shutil.rmtree(capsule_epoch_2)
+
+    # Generate ephemeral Host B signing key
+    host_b_priv, host_b_pub = generate_keypair()
+
     e2_manifest = seal_epoch_2(
         restored_workspace,
         capsule_epoch_2,
         epoch=2,
         parent_manifest_hash=verification["manifest_hash"],
         host_label=host_label,
+        host_b_priv=host_b_priv,
+        host_b_pub=host_b_pub,
+        challenge_nonce=args.challenge_nonce,
     )
     print(f"  E2 manifest hash: {e2_manifest['manifest_hash']}")
     print(f"  E2 parent hash: {e2_manifest['parent_manifest_hash']}")
@@ -471,7 +545,10 @@ def main() -> int:
             "sha256": e2_tar_sha256,
         },
         "owner_public_key": EMBEDDED_OWNER_PUB,
-        "claim": f"Host B ({host_label}) independently restored E1, verified owner signature, executed pipeline, sealed E2.",
+        "host_b_public_key": host_b_pub.hex(),
+        "host_b_signature": e2_manifest.get("host_b_signature", ""),
+        "challenge_nonce": args.challenge_nonce if args.challenge_nonce else None,
+        "claim": f"Host B ({host_label}) independently restored E1, verified owner signature, executed pipeline, updated agent state, sealed E2.",
         "claim_boundary": "This report is generated by Host B. It proves the capsule was restorable and the pipeline is deterministic on this platform. Cross-platform proof requires the verifier to confirm platforms_differ=true.",
     }
     report_path = out_dir / "host_b_report.json"

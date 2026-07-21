@@ -190,6 +190,63 @@ def phase_host_a(out_dir: Path) -> dict:
         "e1_manifest": e1_manifest,
         "runner_path": runner_path,
         "runner_hash": runner_hash,
+        "release_id": None,  # not a release-based run
+    }
+
+
+def phase_host_a_reuse_release(release_bundle: Path, extract_dir: Path) -> dict:
+    """Phase 1 (alternative): Load a canonical release bundle instead of sealing a new E1.
+
+    This is the key mechanism for multi-provider proof: every provider dispatches
+    the IDENTICAL bundle, so every Host B run begins from the same E1 manifest,
+    owner key, runner hash, and verifier hash. Different E1 hashes would mean
+    different experiments.
+    """
+    print("=" * 60)
+    print("PHASE 1: Load Canonical Release Bundle (no new E1 seal)")
+    print("=" * 60)
+    print(f"  Bundle: {release_bundle}")
+
+    # Import here to avoid circular import at module load time
+    sys.path.insert(0, str(REPO_ROOT))
+    from release import load_release
+
+    release = load_release(release_bundle, extract_dir)
+    manifest = release["manifest"]
+    host_a_dir = release["host_a_dir"]
+
+    # Build a host_a_report compatible with downstream phases
+    report = json.loads((host_a_dir / "host_a_report.json").read_text())
+    # Augment with release identity for evidence binding
+    report["release_id"] = manifest["release_id"]
+    report["release_bundle_sha256"] = manifest.get("release_bundle_sha256", "")
+    report["release_runner_sha256"] = manifest["runner_sha256"]
+    report["release_verifier_sha256"] = manifest["verifier_sha256"]
+    report["release_dependency_lock_sha256"] = manifest["dependency_lock_sha256"]
+    (host_a_dir / "host_a_report.json").write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n"
+    )
+
+    print(f"\n  Release ID:       {manifest['release_id']}")
+    print(f"  E1 manifest hash: {manifest['e1_manifest_hash']}")
+    print(f"  Owner public key: {manifest['owner_public_key'][:16]}...")
+    print(f"  Runner SHA-256:   {manifest['runner_sha256'][:16]}...")
+    print(f"  Verifier SHA-256: {manifest['verifier_sha256'][:16]}...")
+    print(f"  Worker version:   {manifest['worker_version']}")
+    print(f"  Host A platform:  {report['host_a_platform']}")
+    print()
+    print("  This run dispatches the IDENTICAL canonical E1 to a new provider.")
+    print("  Different E1 hashes would mean different experiments.")
+
+    return {
+        "host_a_dir": host_a_dir,
+        "host_a_report": report,
+        "owner_pub": release["owner_pub"],
+        "e1_manifest": release["e1_manifest"],
+        "runner_path": release["runner_path"],
+        "runner_hash": release["runner_hash"],
+        "release_id": manifest["release_id"],
+        "release_manifest": manifest,
     }
 
 
@@ -355,6 +412,22 @@ def main() -> int:
     ap.add_argument("--out", default="/tmp/hdar_proof_run", help="Output directory")
     ap.add_argument("--skip-e2b", action="store_true", help="Skip E2B, verify published evidence only")
     ap.add_argument("--host-label", default="e2b-linux-sandbox", help="Host B label")
+    ap.add_argument(
+        "--reuse-release",
+        default="",
+        help=(
+            "Path to a canonical release_bundle.tar.gz produced by `release.py build`. "
+            "When set, the orchestrator dispatches the IDENTICAL E1 to a new provider "
+            "instead of sealing a fresh E1. This is the mechanism for multi-provider "
+            "proof: every provider runs the same E1, owner key, runner hash, and "
+            "verifier hash."
+        ),
+    )
+    ap.add_argument(
+        "--provider",
+        default="e2b",
+        help="Provider label for this Host B run (e2b, codespaces, colab, chatgpt-linux, external)",
+    )
     args = ap.parse_args()
 
     out_dir = Path(args.out).resolve()
@@ -372,6 +445,10 @@ def main() -> int:
     print(f"Python: {sys.version.split()[0]}")
     print(f"Git commit: {source_binding['commit_sha'][:16]}...")
     print(f"Dirty tree: {source_binding['dirty_tree']}")
+    if args.reuse_release:
+        print(f"Mode: REUSE RELEASE — dispatching identical E1 to provider '{args.provider}'")
+    else:
+        print(f"Mode: FRESH SEAL — building a new E1 (single-provider run)")
     print()
 
     # Write environment manifest and source binding
@@ -382,11 +459,19 @@ def main() -> int:
         json.dumps(source_binding, indent=2, sort_keys=True) + "\n"
     )
 
-    # Phase 1: Host A
-    host_a = phase_host_a(out_dir / "host_a")
+    # Phase 1: Host A — either seal fresh or load canonical release
+    if args.reuse_release:
+        host_a = phase_host_a_reuse_release(
+            Path(args.reuse_release).resolve(),
+            out_dir / "release_extracted",
+        )
+        host_label = args.provider or "reuse-release"
+    else:
+        host_a = phase_host_a(out_dir / "host_a")
+        host_label = args.host_label
 
     # Phase 2: Host B on E2B
-    host_b = phase_host_b_e2b(host_a, out_dir / "host_b", args.host_label)
+    host_b = phase_host_b_e2b(host_a, out_dir / "host_b", host_label)
 
     # Phase 3: Verify after sandbox destroyed
     verify = phase_verify(host_a, host_b)
@@ -410,6 +495,11 @@ def main() -> int:
     print(f"  Verifier: {'ALL PASS' if verify['verifier_exit_code'] == 0 else 'FAILURES'}")
     print(f"  Git commit: {source_binding['commit_sha'][:16]}...")
     print(f"  Dirty tree: {source_binding['dirty_tree']}")
+    if host_a.get("release_id"):
+        print(f"  Release ID: {host_a['release_id']}")
+        print(f"  Mode: REUSE RELEASE (identical E1 dispatched to provider '{args.provider}')")
+    else:
+        print(f"  Mode: FRESH SEAL (single-provider run)")
     print()
 
     return verify["verifier_exit_code"]
