@@ -1,0 +1,39 @@
+name: HDAR Host B Proof
+
+on:
+  workflow_dispatch:
+
+jobs:
+  host-b-linux:
+    name: Host B on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-22.04, macos-14]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install cryptography
+        run: pip install cryptography
+      
+      - name: Run Host B
+        run: |
+          python3 run_host_b_embedded.py \
+            --out ./host_b_output \
+            --host-label "github-actions-${{ matrix.os }}" \
+            --operator "github-actions"
+      
+      - name: Upload Host B report
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-b-report-${{ matrix.os }}
+          path: |
+            host_b_output/host_b_report.json
+            host_b_output/capsule_epoch_2/
+          retention-days: 90
