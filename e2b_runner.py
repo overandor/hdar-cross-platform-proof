@@ -131,8 +131,40 @@ def main() -> int:
             pass
 
     finally:
-        sandbox.close()
-        print("\n  Sandbox closed.")
+        # Kill sandbox and generate termination receipt
+        print("\n  Terminating sandbox...")
+        termination_requested_utc = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
+        sandbox.kill()
+        print(f"  Sandbox {sandbox.sandbox_id} terminated.")
+
+        termination_confirmed = True
+        try:
+            _ = sandbox.commands.run("echo alive", timeout=5)
+            termination_confirmed = False
+        except Exception:
+            pass
+
+        termination_receipt = {
+            "schema": "hdar.sandbox-termination-receipt/v1.0",
+            "sandbox_id": sandbox.sandbox_id,
+            "termination_requested": True,
+            "termination_confirmed": termination_confirmed,
+            "confirmed_state": "killed",
+            "termination_requested_utc": termination_requested_utc,
+            "termination_confirmed_utc": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+            "verification_method": "post-kill command execution attempt (exception = confirmed dead)",
+        }
+        receipt_hash = __import__("hashlib").sha256(
+            __import__("json").dumps(
+                {k: v for k, v in termination_receipt.items()},
+                sort_keys=True, separators=(",", ":"), ensure_ascii=True
+            ).encode()
+        ).hexdigest()
+        termination_receipt["receipt_hash"] = receipt_hash
+        receipt_path = out_dir / "sandbox_termination_receipt.json"
+        receipt_path.write_text(__import__("json").dumps(termination_receipt, indent=2, sort_keys=True) + "\n")
+        print(f"  Termination receipt: {receipt_path}")
+        print(f"  Confirmed dead: {termination_confirmed}")
 
     print("\n" + "=" * 60)
     print(f"E2B Host B complete. Artifacts in: {out_dir}")

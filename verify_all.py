@@ -220,6 +220,21 @@ def verify_single_host_b(
           missing == 0 and corrupt == 0,
           f"missing={missing} corrupt={corrupt}" if missing or corrupt else "all blocks verified")
 
+    # 21. Sandbox termination receipt (optional — present for E2B runs)
+    termination_receipt_path = e2_capsule_dir.parent / "sandbox_termination_receipt.json"
+    if termination_receipt_path.exists():
+        term_receipt = json.loads(termination_receipt_path.read_text())
+        term_confirmed = term_receipt.get("termination_confirmed", False)
+        term_hash_valid = sha256_bytes(canonical_json(
+            {k: v for k, v in term_receipt.items() if k != "receipt_hash"}
+        )) == term_receipt.get("receipt_hash")
+        check("Sandbox termination receipt valid",
+              term_confirmed and term_hash_valid,
+              f"confirmed={term_confirmed} hash_valid={term_hash_valid} sandbox_id={term_receipt.get('sandbox_id', '')[:16]}...")
+    else:
+        # Not an E2B run — skip silently (not a failure)
+        pass
+
     return _build_verdict(checks, host_label)
 
 
