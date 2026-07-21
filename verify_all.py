@@ -220,6 +220,28 @@ def verify_single_host_b(
           missing == 0 and corrupt == 0,
           f"missing={missing} corrupt={corrupt}" if missing or corrupt else "all blocks verified")
 
+    # 20b. Source-commit binding present in Host A report (optional — added in v1.1)
+    source_binding = host_a_report.get("source_commit_binding", {})
+    has_commit = bool(source_binding.get("commit_sha"))
+    has_file_hashes = bool(source_binding.get("canonical_file_hashes"))
+    if has_commit or has_file_hashes:
+        check("Source-commit binding present",
+              has_commit and has_file_hashes,
+              f"commit_sha={source_binding.get('commit_sha', '')[:16]}... file_hashes={'present' if has_file_hashes else 'missing'}")
+
+        # 20c. Runner hash matches source-commit binding
+        if has_file_hashes:
+            runner_hash_in_binding = source_binding["canonical_file_hashes"].get("runner_template", {}).get("sha256", "")
+            runner_hash_actual = sha256_file(host_a_dir / "run_host_b.py") if (host_a_dir / "run_host_b.py").exists() else ""
+            check("Runner hash matches source-commit binding",
+                  runner_hash_in_binding == runner_hash_actual and runner_hash_actual != "",
+                  f"binding={runner_hash_in_binding[:16]}... actual={runner_hash_actual[:16]}...")
+        else:
+            check("Runner hash matches source-commit binding", False, "no source-commit binding")
+    else:
+        # Published evidence predates source-commit binding — skip silently
+        pass
+
     # 21. Sandbox termination receipt (optional — present for E2B runs)
     termination_receipt_path = e2_capsule_dir.parent / "sandbox_termination_receipt.json"
     if termination_receipt_path.exists():
@@ -228,9 +250,18 @@ def verify_single_host_b(
         term_hash_valid = sha256_bytes(canonical_json(
             {k: v for k, v in term_receipt.items() if k != "receipt_hash"}
         )) == term_receipt.get("receipt_hash")
+        operator_reported = term_receipt.get("operator_reported_termination", False)
+        provider_attested = term_receipt.get("provider_attested_termination", False)
+        lifecycle_hash_present = bool(term_receipt.get("lifecycle_request_hash"))
         check("Sandbox termination receipt valid",
               term_confirmed and term_hash_valid,
               f"confirmed={term_confirmed} hash_valid={term_hash_valid} sandbox_id={term_receipt.get('sandbox_id', '')[:16]}...")
+        check("Sandbox termination: operator-reported vs provider-attested distinction",
+              operator_reported and not provider_attested,
+              f"operator_reported={operator_reported} provider_attested={provider_attested}")
+        check("Sandbox termination: lifecycle request hash present",
+              lifecycle_hash_present,
+              f"hash={term_receipt.get('lifecycle_request_hash', '')[:16]}..." if lifecycle_hash_present else "missing")
     else:
         # Not an E2B run — skip silently (not a failure)
         pass

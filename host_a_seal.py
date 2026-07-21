@@ -63,6 +63,47 @@ def canonical_json(data: dict) -> bytes:
     return json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
 
 
+def get_source_commit_binding() -> dict:
+    """Bind evidence packet to a specific Git commit and canonical file hashes."""
+    import subprocess as _sp
+
+    repo_root = Path(__file__).parent.resolve()
+
+    def _git(args: list[str]) -> str:
+        try:
+            r = _sp.run(["git"] + args, cwd=repo_root, capture_output=True, text=True, timeout=5)
+            return r.stdout.strip() if r.returncode == 0 else ""
+        except Exception:
+            return ""
+
+    commit_sha = _git(["rev-parse", "HEAD"])
+    dirty = _git(["status", "--porcelain"])
+    remote_url = _git(["config", "--get", "remote.origin.url"])
+
+    canonical_files = {
+        "builder": "host_a_seal.py",
+        "runner_template": "run_host_b.py",
+        "verifier_template": "verify_all.py",
+        "orchestrator": "run_proof.py",
+    }
+    file_hashes = {}
+    for label, fname in canonical_files.items():
+        fpath = repo_root / fname
+        file_hashes[label] = {
+            "filename": fname,
+            "sha256": sha256_file(fpath) if fpath.exists() else "",
+        }
+
+    return {
+        "repository": remote_url,
+        "commit_sha": commit_sha,
+        "dirty_tree": bool(dirty),
+        "dirty_files": dirty.split("\n") if dirty else [],
+        "protocol_version": PROTOCOL_VERSION,
+        "canonical_file_hashes": file_hashes,
+    }
+
+
 def generate_keypair() -> tuple[bytes, bytes]:
     priv = Ed25519PrivateKey.generate()
     pub = priv.public_key()
@@ -386,6 +427,7 @@ def main() -> int:
     print(f"Transport tar.gz: {len(tar_bytes)} bytes, sha256={tar_sha256}")
 
     # 5. Write host_a_report.json
+    source_binding = get_source_commit_binding()
     report = {
         "schema": "hdar.host-a-report/v1.0",
         "protocol_version": PROTOCOL_VERSION,
@@ -395,6 +437,7 @@ def main() -> int:
         "host_a_runtime_destroyed": True,
         "owner_public_key": owner_pub.hex(),
         "owner_signature_algorithm": "ed25519",
+        "source_commit_binding": source_binding,
         "capsule_epoch_1": {
             "manifest_hash": manifest["manifest_hash"],
             "workspace_root_hash": manifest["workspace_manifest"]["root_hash"],

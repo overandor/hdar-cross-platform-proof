@@ -153,6 +153,12 @@ def main() -> int:
             "termination_requested_utc": termination_requested_utc,
             "termination_confirmed_utc": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
             "verification_method": "post-kill command execution attempt (exception = confirmed dead)",
+            "operator_reported_termination": True,
+            "provider_attested_termination": False,
+            "provider_attestation_note": "E2B API does not expose a signed termination attestation; operator reports kill() call and post-kill confirmation",
+            "lifecycle_request_hash": __import__("hashlib").sha256(
+                f"{sandbox.sandbox_id}:{termination_requested_utc}".encode()
+            ).hexdigest(),
         }
         receipt_hash = __import__("hashlib").sha256(
             __import__("json").dumps(

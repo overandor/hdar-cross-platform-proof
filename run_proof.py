@@ -40,6 +40,79 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def get_environment_manifest() -> dict:
+    """Capture Host A environment for evidence binding."""
+    import subprocess as _sp
+
+    def _pip_freeze() -> list[str]:
+        try:
+            r = _sp.run([sys.executable, "-m", "pip", "freeze"], capture_output=True, text=True, timeout=10)
+            return r.stdout.strip().split("\n") if r.returncode == 0 else []
+        except Exception:
+            return []
+
+    packages = _pip_freeze()
+    package_hashes = {}
+    for pkg in packages:
+        if "==" in pkg:
+            name, version = pkg.split("==", 1)
+            package_hashes[name.strip().lower()] = version.strip()
+
+    return {
+        "python_version": sys.version,
+        "platform": platform.platform(),
+        "processor": platform.processor(),
+        "machine": platform.machine(),
+        "os_uname": list(platform.uname()),
+        "locale": os.environ.get("LANG", os.environ.get("LC_ALL", "")),
+        "timezone": time.tzname[0] if time.tzname else "",
+        "installed_packages": packages,
+        "package_count": len(packages),
+        "pinned_versions": {
+            "cryptography": package_hashes.get("cryptography", ""),
+            "e2b": package_hashes.get("e2b", ""),
+        },
+    }
+
+
+def get_source_commit_binding() -> dict:
+    """Bind proof to a specific Git commit and canonical file hashes."""
+    import subprocess as _sp
+
+    def _git(args: list[str]) -> str:
+        try:
+            r = _sp.run(["git"] + args, cwd=REPO_ROOT, capture_output=True, text=True, timeout=5)
+            return r.stdout.strip() if r.returncode == 0 else ""
+        except Exception:
+            return ""
+
+    commit_sha = _git(["rev-parse", "HEAD"])
+    dirty = _git(["status", "--porcelain"])
+    remote_url = _git(["config", "--get", "remote.origin.url"])
+
+    canonical_files = {
+        "builder": "host_a_seal.py",
+        "runner_template": "run_host_b.py",
+        "verifier_template": "verify_all.py",
+        "orchestrator": "run_proof.py",
+    }
+    file_hashes = {}
+    for label, fname in canonical_files.items():
+        fpath = REPO_ROOT / fname
+        file_hashes[label] = {
+            "filename": fname,
+            "sha256": sha256_file(fpath) if fpath.exists() else "",
+        }
+
+    return {
+        "repository": remote_url,
+        "commit_sha": commit_sha,
+        "dirty_tree": bool(dirty),
+        "dirty_files": dirty.split("\n") if dirty else [],
+        "canonical_file_hashes": file_hashes,
+    }
+
+
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -221,6 +294,10 @@ def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str) -> dict:
             "termination_requested_utc": termination_requested_utc,
             "termination_confirmed_utc": utc_now_iso(),
             "verification_method": "post-kill command execution attempt (exception = confirmed dead)",
+            "operator_reported_termination": True,
+            "provider_attested_termination": False,
+            "provider_attestation_note": "E2B API does not expose a signed termination attestation; operator reports kill() call and post-kill confirmation",
+            "lifecycle_request_hash": sha256_bytes(f"{sandbox_id}:{termination_requested_utc}".encode()),
         }
         termination_receipt["receipt_hash"] = sha256_bytes(
             canonical_json({k: v for k, v in termination_receipt.items() if k != "receipt_hash"})
@@ -288,10 +365,22 @@ def main() -> int:
 
     # Full end-to-end
     start_utc = utc_now_iso()
+    env_manifest = get_environment_manifest()
+    source_binding = get_source_commit_binding()
     print(f"HDAR Canonical Proof — started {start_utc}")
     print(f"Host A platform: {platform.platform()}")
     print(f"Python: {sys.version.split()[0]}")
+    print(f"Git commit: {source_binding['commit_sha'][:16]}...")
+    print(f"Dirty tree: {source_binding['dirty_tree']}")
     print()
+
+    # Write environment manifest and source binding
+    (out_dir / "environment_manifest.json").write_text(
+        json.dumps(env_manifest, indent=2, sort_keys=True) + "\n"
+    )
+    (out_dir / "source_commit_binding.json").write_text(
+        json.dumps(source_binding, indent=2, sort_keys=True) + "\n"
+    )
 
     # Phase 1: Host A
     host_a = phase_host_a(out_dir / "host_a")
@@ -316,7 +405,11 @@ def main() -> int:
     print(f"  E2 hash:  {host_b['host_b_report']['capsule_e2']['manifest_hash'][:16]}...")
     print(f"  Pipeline: {host_b['host_b_report']['pipeline_result']['output_hash'][:16]}...")
     print(f"  Sandbox killed: {host_b['termination_receipt']['termination_confirmed']}")
+    print(f"  Operator reported: {host_b['termination_receipt']['operator_reported_termination']}")
+    print(f"  Provider attested: {host_b['termination_receipt']['provider_attested_termination']}")
     print(f"  Verifier: {'ALL PASS' if verify['verifier_exit_code'] == 0 else 'FAILURES'}")
+    print(f"  Git commit: {source_binding['commit_sha'][:16]}...")
+    print(f"  Dirty tree: {source_binding['dirty_tree']}")
     print()
 
     return verify["verifier_exit_code"]
