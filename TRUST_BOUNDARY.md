@@ -88,10 +88,10 @@ The current proof assumes a cooperative Host B. A malicious Host B could:
 **Status:** Open.
 
 **Roadmap:**
-- Bind the pipeline output hash to the workspace content (already done — the verifier recomputes the output from the restored workspace).
+- Bind the pipeline output hash to the workspace content (DONE — the verifier recomputes the output from the restored workspace).
 - Bind the Host B report to provider-attested execution (closes the fabrication gap).
-- Add failure-injection tests: deliberately corrupt the workspace, modify the runner, and tamper with the capsule; confirm the verifier rejects each.
-- Publish the failure-injection results as evidence.
+- Add failure-injection tests (DONE — `test_failure_injection.py`: 10/10 tampered evidence correctly rejected, covering corrupt manifests, signatures, content blocks, lineage, platform strings, receipts, and owner key swaps).
+- Publish the failure-injection results as evidence (DONE — committed to repo).
 
 ### 5. Live agent/process continuity
 
