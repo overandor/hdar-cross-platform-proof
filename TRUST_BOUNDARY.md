@@ -154,7 +154,7 @@ Any newer source-commit binding, termination receipt changes, or audit additions
 
 ## Strongest claim that survives scrutiny
 
-> **HDAR demonstrates that an owner-signed, content-addressed workspace can be transported to separately provisioned heterogeneous runtimes, restored byte-exactly, deterministically advanced through a bounded task, and resealed into a cryptographically linked successor epoch. The current proof authenticates Host A and artifact lineage; externally attested Host B provenance, adversarial-host resistance, and implementation-independent verification remain open validation boundaries.**
+> **HDAR demonstrates that an owner-signed, content-addressed workspace can be transported to separately provisioned heterogeneous runtimes, restored byte-exactly, deterministically advanced through a bounded task, and resealed into a cryptographically linked successor epoch. The current proof authenticates Host A and artifact lineage, with implementation-independent verification confirmed by two independent codebases (Python and Rust, both must pass). Externally attested Host B provenance and adversarial-host resistance remain open validation boundaries.**
 
 ## Canonical release bundle (the next milestone)
 
