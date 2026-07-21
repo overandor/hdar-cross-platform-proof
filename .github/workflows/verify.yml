@@ -1,0 +1,87 @@
+name: HDAR Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify-python:
+    name: Python Verifier + Failure-Injection Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install cryptography
+        run: pip install cryptography
+
+      - name: Run Python verifier against published evidence
+        run: |
+          python3 prove.py --python-only
+
+      - name: Run failure-injection tests
+        run: |
+          python3 test_failure_injection.py
+
+  verify-rust:
+    name: Independent Rust Verifier
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install cryptography
+        run: pip install cryptography
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust verifier
+        run: |
+          cd rust_verifier
+          cargo build --release
+
+      - name: Run Rust verifier against all published evidence
+        run: |
+          for platform in evidence/codespaces evidence/github-actions/ubuntu-22.04 evidence/github-actions/ubuntu-24.04 evidence/github-actions/macos-14; do
+            echo "--- $platform ---"
+            ./rust_verifier/target/release/hdar-verify \
+              --host-a-dir . \
+              --host-b-report "$platform/host_b_report.json" \
+              --e2-capsule "$platform/capsule_epoch_2"
+          done
+
+  verify-dual:
+    name: Dual Verifier (Python + Rust)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install cryptography
+        run: pip install cryptography
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run dual verification (both verifiers must pass)
+        run: |
+          python3 prove.py
