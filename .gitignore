@@ -10,3 +10,4 @@ owner_private_key.txt
 release_bundle/
 wheels/
 
+rust_verifier/target/

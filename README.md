@@ -27,6 +27,24 @@ python3 prove.py
 
 This runs 21 checks per platform (84 total) against the published evidence. All artifacts are in the repo — no network access to remote platforms needed.
 
+### Independent Rust Verifier
+
+For implementation-independent verification (the audit's "next category-changing result"):
+
+```bash
+cd rust_verifier
+cargo build --release
+cd ..
+for platform in evidence/codespaces evidence/github-actions/ubuntu-22.04 evidence/github-actions/ubuntu-24.04 evidence/github-actions/macos-14; do
+  ./rust_verifier/target/release/hdar-verify \
+    --host-a-dir . \
+    --host-b-report "$platform/host_b_report.json" \
+    --e2-capsule "$platform/capsule_epoch_2"
+done
+```
+
+The Rust verifier shares NO code with the Python verifier. It uses independent cryptographic libraries (`sha2` from RustCrypto, `ed25519-dalek`, `serde_json`) and reimplements all 21 checks from the capsule format specification. All 4 platforms pass 21/21.
+
 ## What the Verifier Checks (21 per platform)
 
 | # | Check | What it proves |
@@ -142,6 +160,7 @@ This workflow builds one canonical release bundle, dispatches the **identical** 
 - `run_host_b.py` — Host B runner template (gets capsule embedded by host_a_seal.py)
 - `run_host_b_embedded.py` — Host B runner with capsule already embedded (gitignored, used by CI)
 - `verify_all.py` — Independent verifier (runs on Host A or any third machine)
+- `rust_verifier/` — Independent Rust verifier (shares NO code with Python; uses sha2, ed25519-dalek, serde_json)
 - `release.py` — Canonical release bundle builder (freezes one E1 for multi-provider dispatch)
 - `run_proof.py` — End-to-end orchestrator (supports `--reuse-release` for multi-provider proof)
 - `e2b_runner.py` — E2B sandbox runner for remote Linux execution

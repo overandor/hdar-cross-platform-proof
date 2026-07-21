@@ -67,9 +67,15 @@ The verifier (`verify_all.py`) shares Python with the sealer (`host_a_seal.py`).
 
 **Status:** Open.
 
-**Roadmap:**
-- Implement an independent verifier in Rust or Go that reads the same capsule format and performs the same checks.
-- Publish both verifiers and require both to pass on the same evidence.
+**Status:** Infrastructure built — independent Rust verifier implemented.
+
+**What's built:**
+- `rust_verifier/` — a complete independent verifier in Rust that reimplements all 21 checks from the capsule format specification. Shares NO code with the Python verifier. Uses independent cryptographic libraries: `sha2` (RustCrypto), `ed25519-dalek`, `serde_json`.
+- All 4 published platforms pass 21/21 with the Rust verifier (84/84 total).
+- The Rust verifier handles backward compatibility with older evidence formats (field name variations, absent source-commit binding).
+
+**Roadmap (remaining):**
+- Publish both verifiers and require both to pass on the same evidence (CI integration).
 - Have an unaffiliated reviewer audit the verifier logic.
 
 ### 4. Adversarial-host resistance
