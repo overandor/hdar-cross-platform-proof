@@ -1,0 +1,23 @@
+{
+  "capsule_epoch_1": {
+    "epoch": 1,
+    "file_count": 5,
+    "manifest_hash": "2737e7a611b1d900339c515995c4fe13ff522487cba8c5af6f4a648a6d3fb077",
+    "total_size": 9965,
+    "workspace_root_hash": "b49b5b8770c4d0ca4b2c6c90e3483472f6e7a0208280eb242117e0677107bc48"
+  },
+  "claim": "Host A sealed Epoch 1 with Ed25519 owner signature. Private key never leaves Host A.",
+  "host_a_platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "host_a_python": "3.13.12 | packaged by Anaconda, Inc. | (main, Feb 24 2026, 16:07:20) [Clang 20.1.8 ]",
+  "host_a_runtime_destroyed": true,
+  "host_a_timestamp": 1784630391.0235589,
+  "owner_public_key": "3fa03ea8102c4c322e91f2ec8a05555abb0bbf37566d8936948d50462748166b",
+  "owner_signature_algorithm": "ed25519",
+  "protocol_version": "hdar-canonical/v1.0",
+  "schema": "hdar.host-a-report/v1.0",
+  "transport_capsule": {
+    "bytes": 3774,
+    "path": "transport_capsule_epoch_1.tar.gz",
+    "sha256": "6070ff00b071aa32fc48a4c520b4baf8b93a9baad10e8935d158ada01f8abf1c"
+  }
+}
