@@ -402,6 +402,62 @@ fn verify(host_a_dir: &str, host_b_report: &str, e2_capsule: &str) -> Result<Vec
     }
     // Old evidence without source_commit_binding: skip silently (like Python verifier)
 
+    // 22. Semantic agent continuation (optional — old evidence predates this)
+    // Verify agent_state.json in E2 shows epoch advancement and task completion.
+    // Only run if agent_state.json exists AND shows signs of Host B update.
+    let agent_state_entry = e2_manifest["workspace_manifest"]["files"]
+        .as_array()
+        .and_then(|files| {
+            files.iter().find(|f| f["rel_path"].as_str() == Some("agent_state.json"))
+        });
+
+    if let Some(entry) = agent_state_entry {
+        let digest = entry["sha256"].as_str().unwrap_or("");
+        let blob_path = e2_capsule.join("blocks").join(&digest[..2]).join(digest);
+        if blob_path.exists() {
+            let agent_blob = fs::read_to_string(&blob_path).unwrap_or_default();
+            let agent_state: Value = serde_json::from_str(&agent_blob).unwrap_or(Value::Null);
+            let e2_epoch = agent_state["epoch"].as_i64().unwrap_or(0);
+            let e2_status = agent_state["status"].as_str().unwrap_or("");
+
+            // Only check if Host B updated the semantic state
+            if e2_epoch != 1 || e2_status != "sealed_on_host_a" {
+                let e2_task_completed = agent_state["task_completed"].as_bool().unwrap_or(false);
+                let e2_prev_hash = agent_state["previous_manifest_hash"].as_str().unwrap_or("");
+                let e1_hash = e1_manifest["manifest_hash"].as_str().unwrap_or("");
+
+                check!(
+                    "Semantic continuation: agent_state.epoch advanced to 2",
+                    e2_epoch == 2,
+                    format!("epoch={} (expected 2)", e2_epoch)
+                );
+                check!(
+                    "Semantic continuation: task_completed is true",
+                    e2_task_completed,
+                    format!("task_completed={}", e2_task_completed)
+                );
+                check!(
+                    "Semantic continuation: status is completed_on_host_b",
+                    e2_status == "completed_on_host_b",
+                    format!("status={}", e2_status)
+                );
+                check!(
+                    "Semantic continuation: previous_manifest_hash matches E1",
+                    e2_prev_hash == e1_hash,
+                    format!("prev_hash={}... e1_hash={}...", &e2_prev_hash[..16.min(e2_prev_hash.len())], &e1_hash[..16.min(e1_hash.len())])
+                );
+            }
+            // else: old evidence — skip silently
+        } else {
+            check!(
+                "Semantic continuation: agent_state.json block present",
+                false,
+                "agent_state.json block missing from E2 capsule".to_string()
+            );
+        }
+    }
+    // No agent_state.json: skip silently
+
     Ok(checks)
 }
 
