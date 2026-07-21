@@ -1,0 +1,85 @@
+{
+  "agent_id": "hdar-cross-platform-agent",
+  "continuation_point": "Host B (codespaces-linux) restored E1, executed pipeline, sealed E2.",
+  "created_at": 1784632084.2645912,
+  "epoch": 2,
+  "manifest_hash": "eb764d48972ac95d20bbaf63715df5c2310faf110efcea0da1f0b8a390f05af4",
+  "objective": "Cross-platform HDAR continuation proof \u2014 Epoch 2 sealed by Host B",
+  "parent_manifest_hash": "2737e7a611b1d900339c515995c4fe13ff522487cba8c5af6f4a648a6d3fb077",
+  "protocol_version": "hdar-canonical/v1.0",
+  "schema": "hdar.transport-capsule/v0.1",
+  "source_host_label": "codespaces-linux",
+  "source_host_platform": "Linux-6.8.0-1052-azure-x86_64-with-glibc2.39",
+  "workspace_manifest": {
+    "files": [
+      {
+        "mode": 420,
+        "rel_path": "agent_state.json",
+        "sha256": "62f667e222275d44bc2bca50a0e3158f7d312dd6abd79c5e7e6189ff146b0db2",
+        "size": 384
+      },
+      {
+        "mode": 420,
+        "rel_path": "data/input_records.jsonl",
+        "sha256": "cefc1c255a67a3c52ed5ef19974ebb87edd1def50fb7045adef2390238d5fcd3",
+        "size": 4162
+      },
+      {
+        "mode": 438,
+        "rel_path": "output/final_report.json",
+        "sha256": "11c96fb050131e297c1dd6617a9d192772a93c57400a0aea1fba87cad3e820b7",
+        "size": 2210
+      },
+      {
+        "mode": 438,
+        "rel_path": "output/stage_aggregate.json",
+        "sha256": "706ba3c57c69a2b7e41b3c6a16d78b2bfb5d66b13ef0ddef7393c8a2ef86afa1",
+        "size": 882
+      },
+      {
+        "mode": 438,
+        "rel_path": "output/stage_classify.json",
+        "sha256": "5d4653e5d51e198949ea1359fe12064ba3c75b03437b50097179082e10523ce8",
+        "size": 1285
+      },
+      {
+        "mode": 438,
+        "rel_path": "output/stage_filter.json",
+        "sha256": "bdcacb8d727bd748ae3fdc9afd2d2256f20ae2e0afcbf291f4506ec8608425db",
+        "size": 421
+      },
+      {
+        "mode": 438,
+        "rel_path": "output/stage_parse.json",
+        "sha256": "9ec4de072d5b626b75976d00d0e9a92bc33ad502d1ac3e181b14cda1ba525c52",
+        "size": 269
+      },
+      {
+        "mode": 438,
+        "rel_path": "output/stage_report.json",
+        "sha256": "11c96fb050131e297c1dd6617a9d192772a93c57400a0aea1fba87cad3e820b7",
+        "size": 2210
+      },
+      {
+        "mode": 420,
+        "rel_path": "progress.log",
+        "sha256": "af6265ed61c5a86c62a03ee29a6076f9e4cd4c0aa21540b21ea649243f669eb3",
+        "size": 94
+      },
+      {
+        "mode": 420,
+        "rel_path": "src/worker.py",
+        "sha256": "6ca43441762bdd5cc63a728b2a277a4976f5ff92d391d94c9046a5d49b21e564",
+        "size": 5180
+      },
+      {
+        "mode": 420,
+        "rel_path": "todo.md",
+        "sha256": "36a1743fd2b4c003a581775fd333cd028e7674aaf9356b81d4a6f0e78f9eee95",
+        "size": 145
+      }
+    ],
+    "root_hash": "06aa7409bfc1d429d8cca3ce2391333f8fdaec9056ddc17d7932797bb4351230",
+    "total_size": 17242
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "agent_id": "hdar-cross-platform-agent",
+  "epoch": 2,
+  "event": "capsule_sealed_after_host_b_continuation",
+  "manifest_hash": "eb764d48972ac95d20bbaf63715df5c2310faf110efcea0da1f0b8a390f05af4",
+  "receipt_hash": "e691f629d9bfebc85db46758e62dff8ec929f2b3627336f1cc5789acfd08fb92",
+  "schema": "hdar.receipt/v0.1",
+  "source_host_label": "codespaces-linux",
+  "source_host_platform": "Linux-6.8.0-1052-azure-x86_64-with-glibc2.39",
+  "timestamp": 1784632084.2652729,
+  "workspace_root_hash": "06aa7409bfc1d429d8cca3ce2391333f8fdaec9056ddc17d7932797bb4351230"
+}
