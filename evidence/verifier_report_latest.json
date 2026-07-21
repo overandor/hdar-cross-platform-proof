@@ -75,8 +75,8 @@
           "passed": true
         },
         {
-          "check": "Shared workspace files preserved",
-          "detail": "shared: ['agent_state.json', 'data/input_records.jsonl', 'progress.log', 'src/worker.py', 'todo.md']",
+          "check": "Source workspace files preserved in E2 (identical hash, size, mode)",
+          "detail": "missing=[] modified=[] preserved=2 state_changed=[] unchanged_state=['agent_state.json', 'progress.log', 'todo.md']",
           "passed": true
         },
         {
@@ -95,8 +95,13 @@
           "passed": true
         },
         {
-          "check": "Pipeline output hash in report",
+          "check": "Pipeline output hash present in report",
           "detail": "hash=8708384aa5f7118c...",
+          "passed": true
+        },
+        {
+          "check": "Pipeline output hash recomputed from E2 workspace matches report",
+          "detail": "recomputed=8708384aa5f7118c... report=8708384aa5f7118c...",
           "passed": true
         },
         {
@@ -108,8 +113,8 @@
       "failed": 0,
       "failures": [],
       "host_label": "codespaces-linux",
-      "passed": 20,
-      "total_checks": 20
+      "passed": 21,
+      "total_checks": 21
     },
     {
       "all_passed": true,
@@ -185,8 +190,8 @@
           "passed": true
         },
         {
-          "check": "Shared workspace files preserved",
-          "detail": "shared: ['agent_state.json', 'data/input_records.jsonl', 'progress.log', 'src/worker.py', 'todo.md']",
+          "check": "Source workspace files preserved in E2 (identical hash, size, mode)",
+          "detail": "missing=[] modified=[] preserved=2 state_changed=[] unchanged_state=['agent_state.json', 'progress.log', 'todo.md']",
           "passed": true
         },
         {
@@ -205,8 +210,13 @@
           "passed": true
         },
         {
-          "check": "Pipeline output hash in report",
+          "check": "Pipeline output hash present in report",
           "detail": "hash=8708384aa5f7118c...",
+          "passed": true
+        },
+        {
+          "check": "Pipeline output hash recomputed from E2 workspace matches report",
+          "detail": "recomputed=8708384aa5f7118c... report=8708384aa5f7118c...",
           "passed": true
         },
         {
@@ -218,8 +228,8 @@
       "failed": 0,
       "failures": [],
       "host_label": "github-actions-ubuntu-22.04",
-      "passed": 20,
-      "total_checks": 20
+      "passed": 21,
+      "total_checks": 21
     },
     {
       "all_passed": true,
@@ -295,8 +305,8 @@
           "passed": true
         },
         {
-          "check": "Shared workspace files preserved",
-          "detail": "shared: ['agent_state.json', 'data/input_records.jsonl', 'progress.log', 'src/worker.py', 'todo.md']",
+          "check": "Source workspace files preserved in E2 (identical hash, size, mode)",
+          "detail": "missing=[] modified=[] preserved=2 state_changed=[] unchanged_state=['agent_state.json', 'progress.log', 'todo.md']",
           "passed": true
         },
         {
@@ -315,8 +325,13 @@
           "passed": true
         },
         {
-          "check": "Pipeline output hash in report",
+          "check": "Pipeline output hash present in report",
           "detail": "hash=8708384aa5f7118c...",
+          "passed": true
+        },
+        {
+          "check": "Pipeline output hash recomputed from E2 workspace matches report",
+          "detail": "recomputed=8708384aa5f7118c... report=8708384aa5f7118c...",
           "passed": true
         },
         {
@@ -328,8 +343,8 @@
       "failed": 0,
       "failures": [],
       "host_label": "github-actions-ubuntu-24.04",
-      "passed": 20,
-      "total_checks": 20
+      "passed": 21,
+      "total_checks": 21
     },
     {
       "all_passed": true,
@@ -405,8 +420,8 @@
           "passed": true
         },
         {
-          "check": "Shared workspace files preserved",
-          "detail": "shared: ['agent_state.json', 'data/input_records.jsonl', 'progress.log', 'src/worker.py', 'todo.md']",
+          "check": "Source workspace files preserved in E2 (identical hash, size, mode)",
+          "detail": "missing=[] modified=[] preserved=2 state_changed=[] unchanged_state=['agent_state.json', 'progress.log', 'todo.md']",
           "passed": true
         },
         {
@@ -425,8 +440,13 @@
           "passed": true
         },
         {
-          "check": "Pipeline output hash in report",
+          "check": "Pipeline output hash present in report",
           "detail": "hash=8708384aa5f7118c...",
+          "passed": true
+        },
+        {
+          "check": "Pipeline output hash recomputed from E2 workspace matches report",
+          "detail": "recomputed=8708384aa5f7118c... report=8708384aa5f7118c...",
           "passed": true
         },
         {
@@ -438,8 +458,8 @@
       "failed": 0,
       "failures": [],
       "host_label": "github-actions-macos-14",
-      "passed": 20,
-      "total_checks": 20
+      "passed": 21,
+      "total_checks": 21
     }
   ],
   "overall_passed": true,
@@ -447,5 +467,5 @@
   "schema": "hdar.verifier-report/v1.0",
   "total_host_b_reports": 4,
   "verifier_platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
-  "verifier_timestamp": 1784645225.892838
+  "verifier_timestamp": 1784651976.825552
 }

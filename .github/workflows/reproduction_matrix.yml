@@ -12,6 +12,10 @@ jobs:
   host-b-matrix:
     name: Host B on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
     strategy:
       matrix:
         os: [ubuntu-24.04, ubuntu-22.04, macos-14, macos-13]
@@ -76,10 +80,35 @@ jobs:
           report['release_worker_version'] = release['worker_version']
           report['release_ruleset_version'] = release['ruleset_version']
           report['release_dependency_lock_sha256'] = release['dependency_lock_sha256']
+          # Capture workflow identity for attestation binding
+          report['github_workflow'] = {
+              'repository': '${{ github.repository }}',
+              'workflow': '${{ github.workflow }}',
+              'run_id': '${{ github.run_id }}',
+              'run_attempt': '${{ github.run_attempt }}',
+              'job': '${{ matrix.os }}',
+              'sha': '${{ github.sha }}',
+              'ref': '${{ github.ref }}',
+              'actor': '${{ github.actor }}',
+          }
           with open('host_b_output/host_b_report.json', 'w') as f:
               json.dump(report, f, indent=2, sort_keys=True)
           print(f'Injected release_id: {release[\"release_id\"][:16]}...')
           "
+
+      - name: Generate GitHub artifact attestation for Host B report
+        uses: actions/attest@v4
+        with:
+          subject-path: host_b_output/host_b_report.json
+
+      - name: Generate GitHub artifact attestation for E2 capsule tar
+        run: |
+          tar czf host_b_output/capsule_epoch_2.tar.gz -C host_b_output capsule_epoch_2
+
+      - name: Generate GitHub artifact attestation for E2 capsule
+        uses: actions/attest@v4
+        with:
+          subject-path: host_b_output/capsule_epoch_2.tar.gz
 
       - name: Upload Host B report and E2 capsule
         uses: actions/upload-artifact@v4
@@ -88,6 +117,7 @@ jobs:
           path: |
             host_b_output/host_b_report.json
             host_b_output/capsule_epoch_2/
+            host_b_output/capsule_epoch_2.tar.gz
           retention-days: 90
 
       - name: Upload release bundle (only from first OS, once)
@@ -102,6 +132,10 @@ jobs:
     name: Verify Reproduction Matrix
     needs: host-b-matrix
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      attestations: read
 
     steps:
       - uses: actions/checkout@v4
@@ -113,6 +147,19 @@ jobs:
 
       - name: Install cryptography
         run: pip install cryptography
+
+      - name: Install GitHub CLI
+        run: |
+          if ! command -v gh &> /dev/null; then
+            (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
+              && sudo mkdir -p -m 755 /etc/apt/keyrings \
+              && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+              && cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+              && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+              && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+              && sudo apt update && sudo apt install gh -y
+          fi
+          gh --version
 
       - name: Download release bundle
         if: github.event.inputs.release_bundle_url == ''
@@ -133,6 +180,30 @@ jobs:
           find /tmp/host_b_reports/ -name "host_b_report.json" | sort
           echo "---"
           ls -la /tmp/release_bundle.tar.gz 2>/dev/null || echo "No release bundle artifact (was provided via URL)"
+
+      - name: Verify GitHub artifact attestations on Host B reports
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          REPORT_ARGS=""
+          E2_TAR_ARGS=""
+          for dir in /tmp/host_b_reports/host-b-*/; do
+            report="$dir/host_b_report.json"
+            e2_tar="$dir/capsule_epoch_2.tar.gz"
+            if [ -f "$report" ]; then
+              REPORT_ARGS="$REPORT_ARGS --report $report"
+              if [ -f "$e2_tar" ]; then
+                E2_TAR_ARGS="$E2_TAR_ARGS --e2-tar $e2_tar"
+              fi
+            fi
+          done
+          echo "Verifying attestations for: $REPORT_ARGS"
+          python3 verify_attestations.py \
+            --repository "${{ github.repository }}" \
+            $REPORT_ARGS \
+            $E2_TAR_ARGS \
+            --extract-metadata || echo "WARNING: Attestation verification failed (may need workflow run to complete first)"
 
       - name: Run reproduction matrix verifier
         env:

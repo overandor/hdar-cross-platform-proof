@@ -382,10 +382,12 @@ def main() -> int:
 
     # 1. Generate owner keypair
     owner_priv, owner_pub = generate_keypair()
-    (out_dir / "owner_private_key.txt").write_text(owner_priv.hex() + "\n")
     (out_dir / "owner_public_key.txt").write_text(owner_pub.hex() + "\n")
-    (out_dir / "owner_private_key.txt").chmod(0o600)
+    # NOTE: owner_private_key.txt is NOT written. The verifier only needs the
+    # public key. Persisting the private key is a security risk and serves no
+    # verification purpose. If key recovery is needed, use a real keystore.
     print(f"Owner keypair generated. Public key: {owner_pub.hex()}")
+    print(f"Private key kept in memory only (not persisted to disk).")
 
     # 2. Create workspace
     workspace = out_dir / "_workspace"
@@ -426,15 +428,50 @@ def main() -> int:
     tar_sha256 = sha256_bytes(tar_bytes)
     print(f"Transport tar.gz: {len(tar_bytes)} bytes, sha256={tar_sha256}")
 
-    # 5. Write host_a_report.json
+    # 5. Generate self-contained run_host_b.py (BEFORE writing report, so we
+    #    can record the generated runner hash in the source-commit binding)
+    tar_b64 = base64.b64encode(tar_bytes).decode()
+    runner_path = Path(__file__).parent / "run_host_b.py"
+    runner_template = runner_path.read_text() if runner_path.exists() else ""
+    embedded_runner_sha256 = ""
+    if "EMBEDDED_CAPSULE_B64" in runner_template:
+        runner_text = runner_template
+        runner_text = runner_text.replace('EMBEDDED_CAPSULE_B64 = ""', f'EMBEDDED_CAPSULE_B64 = "{tar_b64}"')
+        runner_text = runner_text.replace('EMBEDDED_CAPSULE_SHA256 = ""', f'EMBEDDED_CAPSULE_SHA256 = "{tar_sha256}"')
+        runner_text = runner_text.replace('EMBEDDED_OWNER_PUB = ""', f'EMBEDDED_OWNER_PUB = "{owner_pub.hex()}"')
+        runner_text = runner_text.replace('EMBEDDED_HOST_A_PLATFORM = ""', f'EMBEDDED_HOST_A_PLATFORM = "{platform.platform()}"')
+        embedded_path = out_dir / "run_host_b.py"
+        embedded_path.write_text(runner_text)
+        embedded_path.chmod(0o755)
+        embedded_runner_sha256 = sha256_file(embedded_path)
+        print(f"Self-contained runner written: {embedded_path} ({len(runner_text)} bytes)")
+        print(f"  Generated runner SHA-256: {embedded_runner_sha256}")
+    else:
+        print("WARNING: run_host_b.py template not found or missing placeholders. Copy manually.")
+
+    # 6. Build source-commit binding with BOTH template and generated runner hashes
     source_binding = get_source_commit_binding()
+    # Add the generated (embedded) runner hash — this is the hash of the runner
+    # that Host B actually executes, with the capsule embedded. The template
+    # hash alone is insufficient because Host A modifies the template.
+    source_binding["canonical_file_hashes"]["runner_template"]["sha256"] = sha256_file(runner_path) if runner_path.exists() else ""
+    source_binding["generated_embedded_runner_sha256"] = embedded_runner_sha256
+    source_binding["generated_embedded_runner_bytes"] = len(runner_text) if "runner_text" in dir() else 0
+
+    # 7. Destroy the workspace (runtime destroyed) — BEFORE writing the report
+    shutil.rmtree(workspace)
+    workspace_destroyed = not workspace.exists()
+    print(f"Workspace destroyed (confirmed: {workspace_destroyed})")
+
+    # 8. Write host_a_report.json — AFTER workspace destruction is confirmed
+    #    and AFTER the embedded runner hash is known
     report = {
         "schema": "hdar.host-a-report/v1.0",
         "protocol_version": PROTOCOL_VERSION,
         "host_a_platform": platform.platform(),
         "host_a_python": sys.version,
         "host_a_timestamp": time.time(),
-        "host_a_runtime_destroyed": True,
+        "host_a_runtime_destroyed": workspace_destroyed,
         "owner_public_key": owner_pub.hex(),
         "owner_signature_algorithm": "ed25519",
         "source_commit_binding": source_binding,
@@ -450,32 +487,15 @@ def main() -> int:
             "bytes": len(tar_bytes),
             "sha256": tar_sha256,
         },
+        "generated_embedded_runner": {
+            "path": "run_host_b.py",
+            "sha256": embedded_runner_sha256,
+            "bytes": len(runner_text) if "runner_text" in dir() else 0,
+        },
         "claim": "Host A sealed Epoch 1 with Ed25519 owner signature. Private key never leaves Host A.",
     }
     (out_dir / "host_a_report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print(f"Host A report written: {out_dir / 'host_a_report.json'}")
-
-    # 6. Clean up workspace (runtime destroyed)
-    shutil.rmtree(workspace)
-    print(f"Workspace destroyed (runtime destroyed=true)")
-
-    # 7. Generate self-contained run_host_b.py
-    tar_b64 = base64.b64encode(tar_bytes).decode()
-    runner_path = Path(__file__).parent / "run_host_b.py"
-    runner_template = runner_path.read_text() if runner_path.exists() else ""
-    # The runner template has EMBEDDED_CAPSULE_B64 and EMBEDDED_CAPSULE_SHA256 placeholders
-    if "EMBEDDED_CAPSULE_B64" in runner_template:
-        runner_text = runner_template
-        runner_text = runner_text.replace('EMBEDDED_CAPSULE_B64 = ""', f'EMBEDDED_CAPSULE_B64 = "{tar_b64}"')
-        runner_text = runner_text.replace('EMBEDDED_CAPSULE_SHA256 = ""', f'EMBEDDED_CAPSULE_SHA256 = "{tar_sha256}"')
-        runner_text = runner_text.replace('EMBEDDED_OWNER_PUB = ""', f'EMBEDDED_OWNER_PUB = "{owner_pub.hex()}"')
-        runner_text = runner_text.replace('EMBEDDED_HOST_A_PLATFORM = ""', f'EMBEDDED_HOST_A_PLATFORM = "{platform.platform()}"')
-        embedded_path = out_dir / "run_host_b.py"
-        embedded_path.write_text(runner_text)
-        embedded_path.chmod(0o755)
-        print(f"Self-contained runner written: {embedded_path} ({len(runner_text)} bytes)")
-    else:
-        print("WARNING: run_host_b.py template not found or missing placeholders. Copy manually.")
 
     print()
     print("=" * 60)
@@ -485,7 +505,6 @@ def main() -> int:
     print(f"  transport_capsule_epoch_1.tar.gz — the sealed capsule")
     print(f"  host_a_report.json     — Host A build report")
     print(f"  run_host_b.py          — self-contained Host B runner (embeds capsule)")
-    print(f"  owner_private_key.txt  — KEEP PRIVATE. Needed for verifier.")
     print()
     print("Next: Copy run_host_b.py to Colab / Codespaces / E2B and run it.")
     return 0

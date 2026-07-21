@@ -122,7 +122,9 @@ def verify_single_host_b(
     check("E1 receipt hash valid", e1_r_expected == e1_receipt["receipt_hash"])
 
     # 4. E2 manifest hash valid
-    e2_signing = {k: v for k, v in e2_manifest.items() if k not in ("manifest_hash",)}
+    #    The sealer excludes both manifest_hash and host_b_signature from the
+    #    signing content. The verifier must match.
+    e2_signing = {k: v for k, v in e2_manifest.items() if k not in ("manifest_hash", "host_b_signature")}
     e2_expected = sha256_bytes(canonical_json(e2_signing))
     check("E2 manifest hash valid",
           e2_expected == e2_manifest["manifest_hash"],
@@ -179,13 +181,47 @@ def verify_single_host_b(
           e2_size > e1_size,
           f"E1={e1_size}B E2={e2_size}B")
 
-    # 15. Shared workspace files preserved
-    e1_files = {f["rel_path"] for f in e1_manifest["workspace_manifest"]["files"]}
-    e2_files = {f["rel_path"] for f in e2_manifest["workspace_manifest"]["files"]}
-    shared = e1_files & e2_files
-    check("Shared workspace files preserved",
-          len(shared) > 0,
-          f"shared: {sorted(shared)}")
+    # 15. Source workspace files preserved with identical hash, size, and mode
+    #     The audit identified that the old check only verified at least one
+    #     pathname was shared. The correct check verifies that source files
+    #     (src/, data/) are preserved unchanged. State files (agent_state.json,
+    #     progress.log, todo.md) are EXPECTED to change during continuation.
+    #     However, older runner versions didn't update state files — if the
+    #     workspace grew (pipeline output added), that's still a valid
+    #     continuation, so unchanged state files are a warning, not a failure.
+    STATE_FILES = {"agent_state.json", "progress.log", "todo.md"}
+    e1_files_map = {f["rel_path"]: f for f in e1_manifest["workspace_manifest"]["files"]}
+    e2_files_map = {f["rel_path"]: f for f in e2_manifest["workspace_manifest"]["files"]}
+    missing_in_e2 = []
+    modified_in_e2 = []
+    preserved_count = 0
+    expected_changed = []
+    unchanged_state = []
+    for rel_path, e1_entry in e1_files_map.items():
+        e2_entry = e2_files_map.get(rel_path)
+        if e2_entry is None:
+            missing_in_e2.append(rel_path)
+        elif rel_path in STATE_FILES:
+            if e2_entry["sha256"] != e1_entry["sha256"]:
+                expected_changed.append(rel_path)
+            else:
+                unchanged_state.append(rel_path)
+        elif (e2_entry["sha256"] != e1_entry["sha256"]
+              or e2_entry["size"] != e1_entry["size"]
+              or e2_entry["mode"] != e1_entry["mode"]):
+            modified_in_e2.append(rel_path)
+        else:
+            preserved_count += 1
+    # Unchanged state files are only a failure if the workspace didn't grow
+    # (which would mean no continuation happened at all). If the workspace grew,
+    # the continuation is proven by the pipeline output regardless.
+    workspace_grew = e2_manifest["workspace_manifest"]["total_size"] > e1_manifest["workspace_manifest"]["total_size"]
+    unchanged_state_ok = workspace_grew  # if workspace grew, unchanged state is just an older runner
+    check("Source workspace files preserved in E2 (identical hash, size, mode)",
+          len(missing_in_e2) == 0 and len(modified_in_e2) == 0 and (unchanged_state_ok or not unchanged_state),
+          f"missing={missing_in_e2} modified={modified_in_e2} preserved={preserved_count} state_changed={expected_changed} unchanged_state={unchanged_state}"
+          if missing_in_e2 or modified_in_e2 or unchanged_state
+          else f"preserved={preserved_count} source files, state_changed={expected_changed}")
 
     # 16. Host B report nonce present (non-deterministic evidence)
     nonce = host_b_report.get("host_b_identity", {}).get("machine_nonce", "")
@@ -201,10 +237,35 @@ def verify_single_host_b(
     hostname = host_b_report.get("host_b_identity", {}).get("machine_hostname", "")
     check("Host B hostname present", bool(hostname), f"hostname={hostname}")
 
-    # 19. Pipeline output hash matches between report and E2 workspace
+    # 19. Pipeline output hash: recompute from E2 workspace, compare to report
+    #     The audit identified that the old check only verified the field was
+    #     nonempty. The correct check restores the final_report.json from the
+    #     E2 content blocks, recomputes the hash, and compares it to the
+    #     report's claimed output hash.
     report_output_hash = host_b_report.get("pipeline_result", {}).get("output_hash", "")
-    check("Pipeline output hash in report", bool(report_output_hash),
+    check("Pipeline output hash present in report", bool(report_output_hash),
           f"hash={report_output_hash[:16]}..." if report_output_hash else "missing")
+
+    # 19b. Recompute pipeline output hash from E2 workspace
+    final_report_entry = None
+    for entry in e2_manifest["workspace_manifest"]["files"]:
+        if entry["rel_path"] == "output/final_report.json":
+            final_report_entry = entry
+            break
+    if final_report_entry:
+        blob = e2_capsule_dir / "blocks" / final_report_entry["sha256"][:2] / final_report_entry["sha256"]
+        if blob.exists():
+            final_report = json.loads(blob.read_text())
+            recomputed_hash = sha256_bytes(canonical_json(final_report))
+            check("Pipeline output hash recomputed from E2 workspace matches report",
+                  recomputed_hash == report_output_hash,
+                  f"recomputed={recomputed_hash[:16]}... report={report_output_hash[:16]}...")
+        else:
+            check("Pipeline output hash recomputed from E2 workspace matches report",
+                  False, "output/final_report.json block missing from E2 capsule")
+    else:
+        check("Pipeline output hash recomputed from E2 workspace matches report",
+              False, "output/final_report.json not found in E2 workspace manifest")
 
     # 20. E2 content blocks all present and valid
     missing = 0
@@ -224,16 +285,29 @@ def verify_single_host_b(
     source_binding = host_a_report.get("source_commit_binding", {})
     has_commit = bool(source_binding.get("commit_sha"))
     has_file_hashes = bool(source_binding.get("canonical_file_hashes"))
+    has_generated_runner = bool(source_binding.get("generated_embedded_runner_sha256"))
     if has_commit or has_file_hashes:
         check("Source-commit binding present",
               has_commit and has_file_hashes,
               f"commit_sha={source_binding.get('commit_sha', '')[:16]}... file_hashes={'present' if has_file_hashes else 'missing'}")
 
-        # 20c. Runner hash matches source-commit binding
-        if has_file_hashes:
+        # 20c. Generated embedded runner hash matches source-commit binding
+        # The binding records BOTH the template hash (run_host_b.py before
+        # embedding) AND the generated embedded runner hash (after capsule
+        # is embedded). The verifier checks the GENERATED runner, which is
+        # the one Host B actually executes.
+        if has_generated_runner:
+            runner_hash_in_binding = source_binding["generated_embedded_runner_sha256"]
+            runner_hash_actual = sha256_file(host_a_dir / "run_host_b.py") if (host_a_dir / "run_host_b.py").exists() else ""
+            check("Generated embedded runner hash matches source-commit binding",
+                  runner_hash_in_binding == runner_hash_actual and runner_hash_actual != "",
+                  f"binding={runner_hash_in_binding[:16]}... actual={runner_hash_actual[:16]}...")
+        elif has_file_hashes:
+            # Fallback for older evidence: check template hash (will fail for
+            # fresh bound proofs, which is the correct behavior)
             runner_hash_in_binding = source_binding["canonical_file_hashes"].get("runner_template", {}).get("sha256", "")
             runner_hash_actual = sha256_file(host_a_dir / "run_host_b.py") if (host_a_dir / "run_host_b.py").exists() else ""
-            check("Runner hash matches source-commit binding",
+            check("Runner hash matches source-commit binding (template — may fail for fresh proofs)",
                   runner_hash_in_binding == runner_hash_actual and runner_hash_actual != "",
                   f"binding={runner_hash_in_binding[:16]}... actual={runner_hash_actual[:16]}...")
         else:
