@@ -1,0 +1,177 @@
+name: HDAR Reproduction Matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_bundle_url:
+        description: 'URL to download release_bundle.tar.gz (or leave empty to build from current commit)'
+        required: false
+        default: ''
+
+jobs:
+  host-b-matrix:
+    name: Host B on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-22.04, macos-14, macos-13]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install cryptography
+        run: pip install cryptography
+
+      - name: Get or build release bundle
+        env:
+          RELEASE_URL: ${{ github.event.inputs.release_bundle_url }}
+        run: |
+          set -e
+          if [ -n "$RELEASE_URL" ]; then
+            echo "Downloading canonical release bundle from: $RELEASE_URL"
+            curl -sL "$RELEASE_URL" -o /tmp/release_bundle.tar.gz
+          else
+            echo "Building canonical release bundle from current commit..."
+            python3 release.py build --out /tmp/hdar_release_build
+            cp /tmp/hdar_release_build/release_bundle.tar.gz /tmp/release_bundle.tar.gz
+            echo "Built release bundle. Uploading as artifact for reproducibility."
+          fi
+          echo "RELEASE_BUNDLE=/tmp/release_bundle.tar.gz" >> $GITHUB_ENV
+          ls -la /tmp/release_bundle.tar.gz
+          sha256sum /tmp/release_bundle.tar.gz || shasum -a 256 /tmp/release_bundle.tar.gz
+
+      - name: Verify release bundle
+        run: |
+          python3 release.py verify /tmp/release_bundle.tar.gz
+
+      - name: Extract release bundle
+        run: |
+          mkdir -p /tmp/release_extracted
+          tar xzf /tmp/release_bundle.tar.gz -C /tmp/release_extracted
+          ls /tmp/release_extracted/
+
+      - name: Run Host B with identical E1
+        run: |
+          python3 /tmp/release_extracted/host_a/run_host_b.py \
+            --out ./host_b_output \
+            --host-label "github-actions-${{ matrix.os }}" \
+            --operator "github-actions" \
+            --challenge-nonce "${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}"
+
+      - name: Inject release ID into report
+        run: |
+          python3 -c "
+          import json
+          release = json.load(open('/tmp/release_extracted/release_manifest.json'))
+          report = json.load(open('host_b_output/host_b_report.json'))
+          report['release_id'] = release['release_id']
+          report['release_bundle_sha256'] = release.get('release_bundle_sha256', '')
+          report['release_runner_sha256'] = release['runner_sha256']
+          report['release_verifier_sha256'] = release['verifier_sha256']
+          report['release_worker_version'] = release['worker_version']
+          report['release_ruleset_version'] = release['ruleset_version']
+          report['release_dependency_lock_sha256'] = release['dependency_lock_sha256']
+          with open('host_b_output/host_b_report.json', 'w') as f:
+              json.dump(report, f, indent=2, sort_keys=True)
+          print(f'Injected release_id: {release[\"release_id\"][:16]}...')
+          "
+
+      - name: Upload Host B report and E2 capsule
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-b-${{ matrix.os }}
+          path: |
+            host_b_output/host_b_report.json
+            host_b_output/capsule_epoch_2/
+          retention-days: 90
+
+      - name: Upload release bundle (only from first OS, once)
+        if: matrix.os == 'ubuntu-24.04' && github.event.inputs.release_bundle_url == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: /tmp/release_bundle.tar.gz
+          retention-days: 90
+
+  verify-matrix:
+    name: Verify Reproduction Matrix
+    needs: host-b-matrix
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install cryptography
+        run: pip install cryptography
+
+      - name: Download release bundle
+        if: github.event.inputs.release_bundle_url == ''
+        uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: /tmp/
+
+      - name: Download all Host B reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: host-b-*
+          merge-multiple: false
+          path: /tmp/host_b_reports/
+
+      - name: List downloaded artifacts
+        run: |
+          find /tmp/host_b_reports/ -name "host_b_report.json" | sort
+          echo "---"
+          ls -la /tmp/release_bundle.tar.gz 2>/dev/null || echo "No release bundle artifact (was provided via URL)"
+
+      - name: Run reproduction matrix verifier
+        env:
+          RELEASE_URL: ${{ github.event.inputs.release_bundle_url }}
+        run: |
+          set -e
+          # Determine release bundle path
+          if [ -n "$RELEASE_URL" ]; then
+            curl -sL "$RELEASE_URL" -o /tmp/release_bundle.tar.gz
+          fi
+          RELEASE_PATH="/tmp/release_bundle.tar.gz"
+
+          # Collect all host_b_report.json files
+          REPORTS=""
+          E2_CAPSULES=""
+          for dir in /tmp/host_b_reports/host-b-*/; do
+            report="$dir/host_b_report.json"
+            capsule="$dir/capsule_epoch_2"
+            if [ -f "$report" ]; then
+              REPORTS="$REPORTS --report $report"
+              if [ -d "$capsule" ]; then
+                E2_CAPSULES="$E2_CAPSULES --e2-capsule $capsule"
+              fi
+            fi
+          done
+
+          echo "Reports: $REPORTS"
+          echo "E2 capsules: $E2_CAPSULES"
+
+          python3 reproduction_matrix.py \
+            --release "$RELEASE_PATH" \
+            $REPORTS \
+            $E2_CAPSULES
+
+      - name: Upload reproduction matrix report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproduction-matrix-result
+          path: |
+            /tmp/host_b_reports/
+          retention-days: 90
