@@ -447,5 +447,5 @@
   "schema": "hdar.verifier-report/v1.0",
   "total_host_b_reports": 4,
   "verifier_platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
-  "verifier_timestamp": 1784644797.847073
+  "verifier_timestamp": 1784645225.892838
 }

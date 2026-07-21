@@ -57,12 +57,35 @@ PROTOCOL_VERSION = "hdar-canonical/v1.0"
 # ---------------------------------------------------------------------------
 
 try:
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey, Ed25519PrivateKey
+    from cryptography.hazmat.primitives import serialization
     HAS_CRYPTO = True
 except ImportError:
     HAS_CRYPTO = False
     print("FATAL: cryptography package required. Install: pip install cryptography", file=sys.stderr)
     sys.exit(1)
+
+
+def generate_keypair() -> tuple[bytes, bytes]:
+    """Generate an ephemeral Ed25519 keypair for Host B signing."""
+    priv = Ed25519PrivateKey.generate()
+    pub = priv.public_key()
+    priv_bytes = priv.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    pub_bytes = pub.public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    return priv_bytes, pub_bytes
+
+
+def sign_message(priv: bytes, msg: bytes) -> bytes:
+    """Sign a message with an Ed25519 private key."""
+    key = Ed25519PrivateKey.from_private_bytes(priv)
+    return key.sign(msg)
 
 
 def sha256_bytes(data: bytes) -> str:
