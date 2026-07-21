@@ -211,15 +211,20 @@ def extract_attestation_metadata(subject_path: Path, repository: str) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="HDAR Attestation Verifier — verify GitHub artifact attestations on Host B reports")
-    ap.add_argument("--report", action="append", default=[], required=True,
+    ap.add_argument("--report", action="append", default=[],
                     help="Path to a Host B report JSON (can specify multiple)")
     ap.add_argument("--e2-tar", action="append", default=[],
                     help="Path to an E2 capsule tar.gz (optional, must match --report order)")
+    ap.add_argument("--archive", action="append", default=[],
+                    help="Path to a Host B evidence archive tar.gz (alternative to --report/--e2-tar)")
     ap.add_argument("--repository", required=True,
                     help="GitHub repository (owner/repo) that generated the attestations")
     ap.add_argument("--extract-metadata", action="store_true",
                     help="Also download and parse attestation metadata for richer evidence")
     args = ap.parse_args()
+
+    if not args.report and not args.archive:
+        ap.error("at least one of --report or --archive is required")
 
     print("=" * 70)
     print("HDAR Attestation Verifier")
@@ -227,13 +232,42 @@ def main() -> int:
     print(f"  Repository: {args.repository}")
     print(f"  Reports: {len(args.report)}")
     print(f"  E2 tars: {len(args.e2_tar)}")
+    print(f"  Archives: {len(args.archive)}")
     print()
-
-    # Pad e2_tars to match reports
-    e2_tars = args.e2_tar + [None] * (len(args.report) - len(args.e2_tar))
 
     all_ok = True
     results = []
+
+    # Verify evidence archives (single attestation per archive)
+    for i, archive_path in enumerate(args.archive):
+        archive = Path(archive_path)
+        print(f"{'─' * 70}")
+        print(f"Archive {i+1}/{len(args.archive)}: {archive}")
+        print(f"  SHA-256: {sha256_file(archive)}")
+
+        print(f"  Verifying GitHub artifact attestation on evidence archive...")
+        result = verify_attestation(archive, args.repository)
+        results.append({"type": "evidence-archive", "path": str(archive), **result})
+
+        status = "PASS" if result["ok"] else "FAIL"
+        print(f"  [{status}] Evidence archive attestation valid")
+        if result["ok"]:
+            print(f"    Attestations found: {result['attestation_count']}")
+            print(f"    Repository: {args.repository}")
+        else:
+            print(f"    Error: {result.get('error', result.get('output', 'unknown'))}")
+            all_ok = False
+
+        if args.extract_metadata and result["ok"]:
+            print(f"  Extracting attestation metadata...")
+            metadata = extract_attestation_metadata(archive, args.repository)
+            if metadata.get("ok"):
+                print(f"    Bundle size: {metadata.get('bundle_size', 'unknown')} bytes")
+            print()
+
+    # Verify individual reports (legacy mode)
+    # Pad e2_tars to match reports
+    e2_tars = args.e2_tar + [None] * (len(args.report) - len(args.e2_tar))
 
     for i, (report_path, e2_path) in enumerate(zip(args.report, e2_tars)):
         report = Path(report_path)

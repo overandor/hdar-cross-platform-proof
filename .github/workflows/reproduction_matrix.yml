@@ -96,28 +96,54 @@ jobs:
           print(f'Injected release_id: {release[\"release_id\"][:16]}...')
           "
 
-      - name: Generate GitHub artifact attestation for Host B report
-        uses: actions/attest@v4
-        with:
-          subject-path: host_b_output/host_b_report.json
-
-      - name: Generate GitHub artifact attestation for E2 capsule tar
+      - name: Build evidence archive for attestation
         run: |
-          tar czf host_b_output/capsule_epoch_2.tar.gz -C host_b_output capsule_epoch_2
+          set -e
+          # Create a single evidence archive containing all Host B evidence.
+          # The attestation will be over this archive, binding all evidence
+          # to the workflow run, commit, and GitHub OIDC identity.
+          mkdir -p evidence_archive
+          cp host_b_output/host_b_report.json evidence_archive/
+          cp -r host_b_output/capsule_epoch_2 evidence_archive/
+          # Write workflow identity metadata
+          cat > evidence_archive/workflow_identity.json <<EOF
+          {
+            "repository": "${{ github.repository }}",
+            "workflow": "${{ github.workflow }}",
+            "run_id": "${{ github.run_id }}",
+            "run_attempt": "${{ github.run_attempt }}",
+            "job": "${{ matrix.os }}",
+            "sha": "${{ github.sha }}",
+            "ref": "${{ github.ref }}",
+            "actor": "${{ github.actor }}",
+            "event": "${{ github.event_name }}",
+            "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          # Write source commit info
+          echo "${{ github.sha }}" > evidence_archive/source_commit.txt
+          # Write challenge nonce (bound to workflow run)
+          echo "${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.os }}" > evidence_archive/challenge_nonce.txt
+          # Create the archive
+          tar czf host_b_evidence_archive.tar.gz -C evidence_archive .
+          echo "Evidence archive contents:"
+          tar tzf host_b_evidence_archive.tar.gz
+          echo "SHA-256:"
+          sha256sum host_b_evidence_archive.tar.gz || shasum -a 256 host_b_evidence_archive.tar.gz
 
-      - name: Generate GitHub artifact attestation for E2 capsule
+      - name: Generate GitHub artifact attestation for evidence archive
         uses: actions/attest@v4
         with:
-          subject-path: host_b_output/capsule_epoch_2.tar.gz
+          subject-path: host_b_evidence_archive.tar.gz
 
-      - name: Upload Host B report and E2 capsule
+      - name: Upload Host B evidence archive
         uses: actions/upload-artifact@v4
         with:
           name: host-b-${{ matrix.os }}
           path: |
+            host_b_evidence_archive.tar.gz
             host_b_output/host_b_report.json
             host_b_output/capsule_epoch_2/
-            host_b_output/capsule_epoch_2.tar.gz
           retention-days: 90
 
       - name: Upload release bundle (only from first OS, once)
@@ -181,28 +207,22 @@ jobs:
           echo "---"
           ls -la /tmp/release_bundle.tar.gz 2>/dev/null || echo "No release bundle artifact (was provided via URL)"
 
-      - name: Verify GitHub artifact attestations on Host B reports
+      - name: Verify GitHub artifact attestations on evidence archives
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          REPORT_ARGS=""
-          E2_TAR_ARGS=""
+          ARCHIVE_ARGS=""
           for dir in /tmp/host_b_reports/host-b-*/; do
-            report="$dir/host_b_report.json"
-            e2_tar="$dir/capsule_epoch_2.tar.gz"
-            if [ -f "$report" ]; then
-              REPORT_ARGS="$REPORT_ARGS --report $report"
-              if [ -f "$e2_tar" ]; then
-                E2_TAR_ARGS="$E2_TAR_ARGS --e2-tar $e2_tar"
-              fi
+            archive="$dir/host_b_evidence_archive.tar.gz"
+            if [ -f "$archive" ]; then
+              ARCHIVE_ARGS="$ARCHIVE_ARGS --archive $archive"
             fi
           done
-          echo "Verifying attestations for: $REPORT_ARGS"
+          echo "Verifying attestations for evidence archives: $ARCHIVE_ARGS"
           python3 verify_attestations.py \
             --repository "${{ github.repository }}" \
-            $REPORT_ARGS \
-            $E2_TAR_ARGS \
+            $ARCHIVE_ARGS \
             --extract-metadata || echo "WARNING: Attestation verification failed (may need workflow run to complete first)"
 
       - name: Run reproduction matrix verifier
