@@ -122,10 +122,17 @@ python3 run_proof.py --reuse-release /tmp/hdar_release/release_bundle.tar.gz --p
 
 Every run begins from the same E1 manifest, owner key, runner hash, and verifier hash. Different Host B keys, E2 hashes, timestamps, and provider identities are expected. **Different E1 hashes mean it is a different experiment.**
 
-### GitHub Actions (automated)
+### GitHub Actions (automated, single E1 per run)
 ```bash
 gh workflow run host_b_proof.yml --repo overandor/hdar-cross-platform-proof
 ```
+
+### GitHub Actions (reproduction matrix — same E1 across 4 providers)
+```bash
+gh workflow run reproduction_matrix.yml --repo overandor/hdar-cross-platform-proof
+```
+
+This workflow builds one canonical release bundle, dispatches the **identical** E1 to Ubuntu 22.04, Ubuntu 24.04, macOS 13, and macOS 14, then runs `reproduction_matrix.py` to confirm all providers ran the same E1 with the same pipeline output hash. This is the audit's central milestone: "make five unrelated computers prove the exact same E1."
 
 ## Files
 
