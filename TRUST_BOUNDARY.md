@@ -11,10 +11,10 @@ This document records what the current HDAR proof authenticates, what it does **
 | E1→E2 lineage mechanics              | A−         |
 | Bounded deterministic replay         | A−         |
 | Cross-runtime execution evidence     | B+         |
-| Host B cryptographic identity        | D          |
-| Provider-backed provenance           | D          |
-| Verifier implementation independence | C−         |
-| Adversarial-host resistance          | C−         |
+| Host B cryptographic identity        | D (infrastructure built, pending real run) |
+| Provider-backed provenance           | D (infrastructure built, pending real run) |
+| Verifier implementation independence | B (independent Rust verifier, both must pass) |
+| Adversarial-host resistance          | B (10/10 failure-injection tests pass) |
 | Live agent/process continuity        | Not demonstrated |
 | Production key governance            | Not demonstrated |
 
@@ -36,25 +36,39 @@ Fields such as `hostname`, `platform` string, `machine_nonce`, timestamps, and `
 **Status:** Infrastructure built — pending real workflow run.
 
 **What's built:**
-- `.github/workflows/reproduction_matrix.yml` now includes `actions/attest@v4` steps that generate Sigstore-signed GitHub artifact attestations for each Host B report and E2 capsule.
-- `verify_attestations.py` verifies these attestations using `gh attestation verify`, binding each report to the repository, commit, workflow run, and runner environment.
+- `.github/workflows/reproduction_matrix.yml` creates a single evidence archive per matrix job containing: host_b_report.json, E2 capsule, workflow_identity.json, source_commit.txt, challenge_nonce.txt. A single `actions/attest@v4` call attests the archive, binding all evidence to the workflow run, commit, and GitHub OIDC identity.
+- `verify_attestations.py` verifies these attestations using `gh attestation verify`, with `--archive` flag for evidence archives and `--report`/`--e2-tar` for legacy per-file attestations.
 - The workflow's `verify-matrix` job runs `verify_attestations.py` automatically after all Host B jobs complete.
+- SLSA classification: signed provenance from a hosted platform = Build Level 2. Level 3 requires a hardened build platform with stronger isolation.
 
 **What's pending:**
-- A real workflow run to generate actual attestations.
+- A real workflow run to generate actual attestations at the current commit.
 - Verification that the attestations bind the correct commit and repository.
 - Documentation of the attestation verification results.
 
+**Trust chain (per web verdict):**
+```
+Owner signature → authenticates E1 and the owner
+Challenge-bound Host B signature → authenticates the continuation report inside the job
+GitHub artifact attestation → authenticates workflow, repository, commit, and artifact digest
+Independent verifier → authenticates the entire E1 → execution → E2 transition
+```
+
 **Roadmap (remaining):**
-- Bind Host B reports to GitHub OIDC federated workflow identity (partially done via `actions/attest` which uses OIDC internally).
 - Have Host B sign reports with an ephemeral key whose certificate chains to a provider-attested identity.
 - Record challenge-bound nonces: the verifier issues a challenge before Host B runs; Host B must include the challenge in its signed report. (The workflow already passes `--challenge-nonce` with the run ID.)
+- Hardware-level attestation would require a trusted execution environment, TPM-backed identity, or confidential-computing evidence.
 
 ### 2. Provider-backed provenance
 
-The repository currently says "different cloud providers." The published evidence only clearly establishes Codespaces plus GitHub-hosted Actions infrastructure, not four independent providers.
+The published evidence establishes four recorded Host B runtime configurations across one Codespaces environment and three separately provisioned GitHub-hosted Actions jobs — not four independent cloud providers. GitHub's public runner documentation supports separately provisioned hosted environments but does not give this repository evidence that the three Actions jobs used an independently identifiable cloud provider distinct from Codespaces.
 
-**Status:** Open.
+**Status:** Open — infrastructure built, pending real workflow run with attestations.
+
+**What's built:**
+- The reproduction matrix workflow attests each Host B evidence archive with GitHub artifact attestations (Sigstore-signed, transparency-logged).
+- This authenticates: repository, organization, workflow, commit SHA, triggering event, GitHub Actions OIDC identity, and artifact digest.
+- This is provider-backed **workflow execution provenance**, not hardware attestation. Hardware-level attestation would require a TEE, TPM-backed identity, or confidential-computing evidence.
 
 **Roadmap:**
 - Dispatch the canonical release bundle (see `release.py`) to genuinely independent providers: E2B, Google Colab, ChatGPT Linux, an independently operated VPS, and an unaffiliated third party.
@@ -63,19 +77,18 @@ The repository currently says "different cloud providers." The published evidenc
 
 ### 3. Verifier implementation independence
 
-The verifier (`verify_all.py`) shares Python with the sealer (`host_a_seal.py`). It re-implements all checks from the capsule format spec, but a single implementation author wrote both.
+The Python verifier (`verify_all.py`) shares Python with the sealer (`host_a_seal.py`). It re-implements all checks from the capsule format spec, but a single implementation author wrote both. The independent Rust verifier closes this gap.
 
-**Status:** Open.
-
-**Status:** Infrastructure built — independent Rust verifier implemented.
+**Status:** Infrastructure built — independent Rust verifier + CI integration.
 
 **What's built:**
 - `rust_verifier/` — a complete independent verifier in Rust that reimplements all 21 checks from the capsule format specification. Shares NO code with the Python verifier. Uses independent cryptographic libraries: `sha2` (RustCrypto), `ed25519-dalek`, `serde_json`.
 - All 4 published platforms pass 21/21 with the Rust verifier (84/84 total).
 - The Rust verifier handles backward compatibility with older evidence formats (field name variations, absent source-commit binding).
+- `prove.py` runs both verifiers and requires both to pass.
+- `.github/workflows/verify.yml` runs both verifiers + failure-injection tests in CI on every push/PR.
 
 **Roadmap (remaining):**
-- Publish both verifiers and require both to pass on the same evidence (CI integration).
 - Have an unaffiliated reviewer audit the verifier logic.
 
 ### 4. Adversarial-host resistance
@@ -85,13 +98,16 @@ The current proof assumes a cooperative Host B. A malicious Host B could:
 - Run a modified pipeline and report a fabricated output hash.
 - Sign a fraudulent E2 with an ephemeral key (the verifier checks the signature is valid, not that the signer is trustworthy).
 
-**Status:** Open.
+**Status:** Partially addressed — failure-injection tests prove the verifier rejects tampered evidence.
 
-**Roadmap:**
-- Bind the pipeline output hash to the workspace content (DONE — the verifier recomputes the output from the restored workspace).
-- Bind the Host B report to provider-attested execution (closes the fabrication gap).
-- Add failure-injection tests (DONE — `test_failure_injection.py`: 10/10 tampered evidence correctly rejected, covering corrupt manifests, signatures, content blocks, lineage, platform strings, receipts, and owner key swaps).
-- Publish the failure-injection results as evidence (DONE — committed to repo).
+**What's built:**
+- `test_failure_injection.py`: 10/10 tampered evidence correctly rejected, covering corrupt manifests, signatures, content blocks, lineage, platform strings, receipts, output hashes, and owner key swaps.
+- Pipeline output hash is recomputed from E2 workspace content (not just checked in report).
+- `.github/workflows/verify.yml` runs failure-injection tests in CI on every push/PR.
+
+**Roadmap (remaining):**
+- Bind the Host B report to provider-attested execution (closes the fabrication gap — infrastructure built, pending real workflow run).
+- Add more adversarial tests: modified runner, swapped E2 from different E1, replayed evidence with stale nonces.
 
 ### 5. Live agent/process continuity
 
