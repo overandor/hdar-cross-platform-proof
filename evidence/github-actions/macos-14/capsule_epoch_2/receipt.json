@@ -1,0 +1,12 @@
+{
+  "agent_id": "hdar-cross-platform-agent",
+  "epoch": 2,
+  "event": "capsule_sealed_after_host_b_continuation",
+  "manifest_hash": "0660e28d52e11017bd4c9c6baeb888dbdea99e38c7132aba734fa759f2c3f448",
+  "receipt_hash": "ac41f7fe2113d68556fe371600c274af77797886f7447fc52d398208e9c08993",
+  "schema": "hdar.receipt/v0.1",
+  "source_host_label": "github-actions-macos-14",
+  "source_host_platform": "macOS-14.8.7-arm64-arm-64bit",
+  "timestamp": 1784632275.213205,
+  "workspace_root_hash": "f7ff8fd15bd999acf9f561eba0bfab56efdc7fa4ed8fd7d55cd890ff5985b35c"
+}

@@ -1,0 +1,18 @@
+{
+  "input_count": 52,
+  "parent_hash": "9a4fc653b4cb582cc58131b23e9f1adca25528d4723ea36b57da628fc802122c",
+  "rejected": [
+    {
+      "id": "rec-bad-01",
+      "reason": "missing_fields"
+    },
+    {
+      "id": "rec-bad-02",
+      "reason": "invalid_value"
+    }
+  ],
+  "rejected_count": 2,
+  "stage": "filter",
+  "stage_hash": "ebc726ad1d630af52beb622ad899f236179dd56755f9d3d2ffaef8c9a396c24a",
+  "valid_count": 50
+}

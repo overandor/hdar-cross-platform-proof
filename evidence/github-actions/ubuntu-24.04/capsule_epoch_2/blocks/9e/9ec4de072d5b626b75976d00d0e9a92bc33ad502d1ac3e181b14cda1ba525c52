@@ -1,0 +1,8 @@
+{
+  "first_id": "rec-0000",
+  "last_id": "rec-bad-02",
+  "parent_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "records_loaded": 52,
+  "stage": "parse",
+  "stage_hash": "9a4fc653b4cb582cc58131b23e9f1adca25528d4723ea36b57da628fc802122c"
+}

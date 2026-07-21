@@ -1,0 +1,16 @@
+{
+  "agent_id": "hdar-cross-platform-agent",
+  "epoch": 1,
+  "host_a_label": "host-a-local-mac",
+  "next_action": "Host B must restore workspace, execute pipeline, and seal epoch 2.",
+  "status": "sealed_on_host_a",
+  "task": "multi_stage_analysis_pipeline",
+  "task_completed": false,
+  "task_stages": [
+    "parse",
+    "filter",
+    "aggregate",
+    "classify",
+    "report"
+  ]
+}
