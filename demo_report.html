@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body { background: #0d1117; color: #c9d1d9; font-family: 'SF Mono', Monaco, monospace; padding: 40px; max-width: 900px; margin: 0 auto; }
+h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 10px; font-size: 22px; }
+h2 { color: #7ee787; font-size: 18px; margin-top: 30px; }
+.pass { color: #7ee787; }
+.fail { color: #f85149; }
+.dim { color: #8b949e; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+td, th { border: 1px solid #30363d; padding: 8px 12px; text-align: left; font-size: 13px; }
+th { background: #161b22; color: #58a6ff; }
+tr:nth-child(even) { background: #161b22; }
+.code { background: #161b22; padding: 16px; border-radius: 6px; font-size: 12px; line-height: 1.6; overflow-x: auto; border: 1px solid #30363d; }
+.hash { color: #d2a8ff; font-size: 11px; }
+.section { margin: 20px 0; padding: 16px; background: #161b22; border-radius: 6px; border: 1px solid #30363d; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+.badge-pass { background: #1b4332; color: #7ee787; }
+.badge-fail { background: #4c1d1d; color: #f85149; }
+.badge-info { background: #1a3a5c; color: #58a6ff; }
+</style>
+</head>
+<body>
+
+<h1>HDAR Cross-Platform Proof — Live Demo Report</h1>
+<p class="dim">Generated: 2026-07-22 18:04 UTC · Run on macOS-26.5.2-arm64</p>
+
+<h2>1. Dual-Verifier Results (Published Evidence)</h2>
+<table>
+<tr><th>Verifier</th><th>Language</th><th>Checks</th><th>Result</th></tr>
+<tr><td>Python (verify_all.py)</td><td>Python</td><td>21 × 4 = 84</td><td class="pass">84/84 PASS</td></tr>
+<tr><td>Rust (rust_verifier/)</td><td>Rust</td><td>21 × 4 = 84</td><td class="pass">84/84 PASS</td></tr>
+<tr><td>Implementation independence</td><td>—</td><td>—</td><td class="pass">CONFIRMED</td></tr>
+</table>
+
+<h2>2. Failure-Injection Tests (Adversarial)</h2>
+<table>
+<tr><th>Test</th><th>Expected</th><th>Result</th></tr>
+<tr><td>Corrupt E1 manifest hash</td><td>REJECT</td><td class="pass">REJECTED ✓</td></tr>
+<tr><td>Corrupt E1 owner signature</td><td>REJECT</td><td class="pass">REJECTED ✓</td></tr>
+<tr><td>Corrupt E2 manifest hash</td><td>REJECT</td><td class="pass">REJECTED ✓</td></tr>
+<tr><td>Corrupt E2 content block</td><td>REJECT</td><td class="pass">REJECTED ✓</td></tr>
+<tr><td>Break E1→E2 lineage</td><td>REJECT</td><td class="pass">REJECTED ✓</td></tr>
+<tr><td>Fabricate platform string</td><td>REJECT</td><td class="pass">REJECTED ✓</td></tr>
+<tr><td>Corrupt E1 receipt hash</td><td>REJECT</td><td class="pass">REJECTED ✓</td></tr>
+<tr><td>Remove E2 content block</td><td>REJECT</td><td class="pass">REJECTED ✓</td></tr>
+<tr><td>Fabricate pipeline output hash</td><td>REJECT</td><td class="pass">REJECTED ✓</td></tr>
+<tr><td>Swap owner public key</td><td>REJECT</td><td class="pass">REJECTED ✓</td></tr>
+</table>
+<p><span class="badge badge-pass">10/10 TAMPERED EVIDENCE REJECTED</span></p>
+
+<h2>3. Fresh End-to-End Run (Live, Just Now)</h2>
+
+<div class="section">
+<h3 style="color:#58a6ff;">Stage 1: Host A Seals Epoch 1</h3>
+<div class="code">
+Owner keypair generated
+<span class="dim">Public key:</span> <span class="hash">d76415e64342c89b43b3ef6f9503fc85338d104a42d571a95d38f70e57e70a7e</span>
+<span class="dim">Private key:</span> kept in memory only (not persisted to disk)
+Workspace created: 7 files
+Capsule sealed. <span class="dim">Manifest hash:</span> <span class="hash">ff4e7adacc1d143e66f784399c349ce085ac2f926a1a1da502bdc291f25b08d4</span>
+Transport tar.gz: 10960 bytes
+<span class="dim">SHA-256:</span> <span class="hash">c6de0b6aa4bf6733d800a2c3e7a4a5625ebee042522d763d5b4c34a9b987ab31</span>
+Workspace destroyed (confirmed: True)
+</div>
+</div>
+
+<div class="section">
+<h3 style="color:#58a6ff;">Stage 2: Host B Restores + Executes Pipeline</h3>
+<div class="code">
+[1/6] Decoding embedded capsule...
+  <span class="dim">Capsule SHA-256:</span> <span class="hash">c6de0b6a...</span>
+  Hash verified: <span class="pass">matches embedded checksum</span>
+
+[2/6] Extracting capsule...
+  Extracted to: /tmp/hdar_fresh_demo/host_b_output
+
+[3/6] Verifying Epoch 1 capsule...
+  <span class="dim">Manifest hash:</span> <span class="hash">ff4e7adacc1d143e...</span>
+  Owner signature valid: <span class="pass">True</span>
+  Files: 5, Size: 9964B
+
+[4/6] Restoring workspace...
+  Restoration exact: <span class="pass">True</span>
+  Files restored: 5
+
+[5/6] Executing 5-stage pipeline...
+  Pipeline output hash: <span class="hash">8708384aa5f7118c1f1b356e9abfda416c1b3c1c33943498c6016fb29b9d396a</span>
+  Stages completed: 5
+    parse:     9a4fc653b4cb582c...
+    filter:    ebc726ad1d630af5...
+    aggregate: 2d666655e5ee4c2b...
+    classify:  bc89250f11012432...
+    report:    1cfa642e5286917a...
+
+[5b/6] Updating agent state for Epoch 2...
+  agent_state.epoch = 2
+  agent_state.task_completed = True
+  agent_state.status = completed_on_host_b
+  todo.md updated: Epoch 2 marked complete
+
+[6/6] Sealing Epoch 2 successor capsule...
+  <span class="dim">E2 manifest hash:</span> <span class="hash">13023b6db1e7e8178e80942c74f6fd05971cebbcbb96ac59dac1c68397988486</span>
+  <span class="dim">E2 parent hash:</span>  <span class="hash">ff4e7adacc1d143e66f784399c349ce085ac2f926a1a1da502bdc291f25b08d4</span>
+  <span class="dim">Host B signature:</span> <span class="hash">0a10d862be8d90542a513bc5aa2c718e9c376f7c...</span>
+  Duration: 0.804s
+</div>
+</div>
+
+<div class="section">
+<h3 style="color:#58a6ff;">Stage 3: Verifier Checks (29/31 pass — 2 expected failures)</h3>
+<div class="code">
+  <span class="pass">[PASS]</span> E1 manifest hash valid
+  <span class="pass">[PASS]</span> E1 Ed25519 owner signature valid
+  <span class="pass">[PASS]</span> E1 receipt hash valid
+  <span class="pass">[PASS]</span> E1 receipt hash bound into manifest
+  <span class="pass">[PASS]</span> E1 environment manifest hash matches binding
+  <span class="pass">[PASS]</span> E2 manifest hash valid
+  <span class="pass">[PASS]</span> E2 receipt hash valid
+  <span class="pass">[PASS]</span> E2 receipt hash bound into manifest
+  <span class="pass">[PASS]</span> E2 environment manifest hash matches binding
+  <span class="pass">[PASS]</span> Cryptographic lineage E1→E2
+  <span class="pass">[PASS]</span> Epoch advancement 1→2
+  <span class="fail">[FAIL]</span> Platform separation (Host A ≠ Host B)
+         <span class="dim">A=macOS-26.5.2-arm64 B=macOS-26.5.2-arm64 (same machine — expected for local demo)</span>
+  <span class="pass">[PASS]</span> Owner public key consistent
+  <span class="fail">[FAIL]</span> Host B report confirms platform separation
+         <span class="dim">report says: False (same machine — expected for local demo)</span>
+  <span class="pass">[PASS]</span> E1 receipt workspace hash matches manifest
+  <span class="pass">[PASS]</span> E2 receipt workspace hash matches manifest
+  <span class="pass">[PASS]</span> E2 workspace differs from E1
+  <span class="pass">[PASS]</span> E2 workspace grew
+  <span class="pass">[PASS]</span> Source workspace files preserved in E2
+  <span class="pass">[PASS]</span> Host B nonce present (fresh evidence)
+  <span class="pass">[PASS]</span> Host B UTC timestamps present
+  <span class="pass">[PASS]</span> Host B hostname present
+  <span class="pass">[PASS]</span> Pipeline output hash present in report
+  <span class="pass">[PASS]</span> Pipeline output hash recomputed from E2 workspace matches report
+  <span class="pass">[PASS]</span> E2 content blocks all valid
+  <span class="pass">[PASS]</span> Source-commit binding present
+  <span class="pass">[PASS]</span> Generated embedded runner hash matches source-commit binding
+  <span class="pass">[PASS]</span> <b>Semantic: agent_state.epoch advanced to 2</b>
+  <span class="pass">[PASS]</span> <b>Semantic: task_completed is true</b>
+  <span class="pass">[PASS]</span> <b>Semantic: status is completed_on_host_b</b>
+  <span class="pass">[PASS]</span> <b>Semantic: previous_manifest_hash matches E1</b>
+</div>
+<p><span class="badge badge-info">29/31 PASS</span> <span class="dim">2 failures are platform separation — expected because Host A and Host B are the same Mac. On real remote platforms (Colab, Codespaces, GitHub Actions), all 31 pass.</span></p>
+</div>
+
+<div class="section">
+<h3 style="color:#58a6ff;">Agent State Inside E2 Capsule (Semantic Continuation)</h3>
+<div class="code">
+{
+  "agent_id": "hdar-cross-platform-agent",
+  "completed_at_utc": "2026-07-22T18:04:17.429312+00:00",
+  "completed_on_platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "epoch": 2,
+  "next_action": "Epoch 3: Transfer E2 to next host or verify lineage.",
+  "previous_manifest_hash": "ff4e7adacc1d143e66f784399c349ce085ac2f926a1a1da502bdc291f25b08d4",
+  "status": "completed_on_host_b",
+  "task": "multi_stage_analysis_pipeline",
+  "task_completed": true
+}
+</div>
+</div>
+
+<h2>4. Cross-Platform Pipeline Determinism</h2>
+<table>
+<tr><th>Platform</th><th>OS</th><th>Arch</th><th>Pipeline Hash</th><th>Match</th></tr>
+<tr><td>Host A (Mac)</td><td>macOS 26.5</td><td>ARM64</td><td class="hash">8708384a...</td><td class="pass">✓</td></tr>
+<tr><td>Codespaces</td><td>Linux 6.8.0</td><td>x86_64</td><td class="hash">8708384a...</td><td class="pass">✓</td></tr>
+<tr><td>GitHub Actions</td><td>Ubuntu 22.04</td><td>x64</td><td class="hash">8708384a...</td><td class="pass">✓</td></tr>
+<tr><td>GitHub Actions</td><td>Ubuntu 24.04</td><td>x64</td><td class="hash">8708384a...</td><td class="pass">✓</td></tr>
+<tr><td>GitHub Actions</td><td>macOS 14</td><td>ARM64</td><td class="hash">8708384a...</td><td class="pass">✓</td></tr>
+</table>
+<p><span class="badge badge-pass">5/5 IDENTICAL OUTPUT HASH</span></p>
+
+<h2>5. What This Proves</h2>
+<div class="section">
+<p><b>Protocol (REAL):</b> Seal → transport → restore → execute → sign successor → verify. Ed25519 signatures, SHA-256 content addressing, cryptographic lineage, dual-verifier confirmation, adversarial robustness.</p>
+<p><b>Payload (DEMO):</b> 5-stage JSONL analysis pipeline. Toy task. Placeholder for real computation.</p>
+<p><b>Continuity (REAL):</b> Agent state advances from epoch 1 → 2. Task marked complete. Previous manifest hash linked. Next action describes epoch 3. Verifier checks all 4 semantic invariants.</p>
+<p class="dim"><b>Not proven:</b> LLM cognition migration, model weight transport, neural state continuity. The protocol is payload-agnostic — the next step is wrapping an ML workload.</p>
+</div>
+
+</body>
+</html>
