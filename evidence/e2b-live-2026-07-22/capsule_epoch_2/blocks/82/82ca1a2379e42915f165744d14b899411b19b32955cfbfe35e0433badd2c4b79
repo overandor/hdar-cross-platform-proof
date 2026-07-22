@@ -1,0 +1,2 @@
+{"epoch": 1, "event": "created_on_host_a", "host": "host-a", "timestamp": 1784743450.610494}
+{"epoch": 2, "event": "completed_on_host_b", "host": "e2b-linux-sandbox", "pipeline_output_hash": "8708384aa5f7118c1f1b356e9abfda416c1b3c1c33943498c6016fb29b9d396a", "platform": "Linux-6.1.158+-x86_64-with-glibc2.36", "timestamp": 1784751313.837114}

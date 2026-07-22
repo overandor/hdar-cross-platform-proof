@@ -1,0 +1,20 @@
+{
+  "hostname": "e2b.local",
+  "installed_packages": [
+    "cffi==2.1.0",
+    "cryptography==49.0.0",
+    "pycparser==3.0"
+  ],
+  "machine": "x86_64",
+  "os_uname": [
+    "Linux",
+    "e2b.local",
+    "6.1.158+",
+    "#1 SMP PREEMPT_DYNAMIC Fri Jul  3 14:02:15 UTC 2026",
+    "x86_64",
+    ""
+  ],
+  "platform": "Linux-6.1.158+-x86_64-with-glibc2.36",
+  "processor": "",
+  "python_version": "3.11.6 (main, Nov 29 2023, 04:19:53) [GCC 12.2.0]"
+}

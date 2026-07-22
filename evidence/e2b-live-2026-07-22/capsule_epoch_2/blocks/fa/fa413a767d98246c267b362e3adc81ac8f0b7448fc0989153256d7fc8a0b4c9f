@@ -1,0 +1,19 @@
+{
+  "agent_id": "hdar-cross-platform-agent",
+  "completed_at_utc": "2026-07-22T20:15:13.836761+00:00",
+  "completed_on_platform": "Linux-6.1.158+-x86_64-with-glibc2.36",
+  "epoch": 2,
+  "host_a_label": "host-a-local-mac",
+  "next_action": "Epoch 3: Transfer E2 to next host or verify lineage.",
+  "previous_manifest_hash": "ff4e7adacc1d143e66f784399c349ce085ac2f926a1a1da502bdc291f25b08d4",
+  "status": "completed_on_host_b",
+  "task": "multi_stage_analysis_pipeline",
+  "task_completed": true,
+  "task_stages": [
+    "parse",
+    "filter",
+    "aggregate",
+    "classify",
+    "report"
+  ]
+}

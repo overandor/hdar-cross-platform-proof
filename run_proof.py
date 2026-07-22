@@ -250,7 +250,7 @@ def phase_host_a_reuse_release(release_bundle: Path, extract_dir: Path) -> dict:
     }
 
 
-def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str) -> dict:
+def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str, challenge_nonce: str = "") -> dict:
     """Phase 2: Run Host B on E2B Linux sandbox."""
     print("\n" + "=" * 60)
     print("PHASE 2: Host B — E2B Linux Sandbox")
@@ -263,9 +263,12 @@ def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str) -> dict:
         sys.exit(1)
 
     print("\n[1/6] Starting E2B sandbox...")
-    sandbox = Sandbox()
+    sandbox = Sandbox.create()
     sandbox_id = sandbox.sandbox_id
+    sandbox_created_utc = utc_now_iso()
     print(f"  Sandbox ID: {sandbox_id}")
+    if challenge_nonce:
+        print(f"  Challenge nonce: {challenge_nonce[:16]}...")
 
     sandbox_start_utc = utc_now_iso()
 
@@ -287,8 +290,9 @@ def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str) -> dict:
 
         # Run Host B
         print("\n[4/6] Running Host B in sandbox...")
+        nonce_arg = f" --challenge-nonce {challenge_nonce}" if challenge_nonce else ""
         result = sandbox.commands.run(
-            f"cd /home/user && python3 run_host_b.py --out /home/user/host_b_output --host-label {host_label} --operator e2b-sandbox",
+            f"cd /home/user && python3 run_host_b.py --out /home/user/host_b_output --host-label {host_label} --operator e2b-sandbox{nonce_arg}",
             timeout=120,
         )
         print(f"  Exit code: {result.exit_code}")
@@ -309,6 +313,22 @@ def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str) -> dict:
         report_path = out_dir / "host_b_report.json"
         report_path.write_text(report_content)
         print(f"  Downloaded: {report_path}")
+
+        # Inject E2B provider metadata into the report
+        report = json.loads(report_content)
+        report["e2b_provider_evidence"] = {
+            "sandbox_id": sandbox_id,
+            "sandbox_created_utc": sandbox_created_utc,
+            "provider": "e2b.dev",
+            "template": "base",
+            "bound_into_report": True,
+            "binding_note": "Sandbox ID injected by run_proof.py after sandbox execution, before kill.",
+        }
+        report["e2b_provider_evidence"]["evidence_hash"] = hashlib.sha256(
+            json.dumps(report["e2b_provider_evidence"], sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+        print(f"  Injected E2B provider evidence (sandbox_id={sandbox_id})")
 
         e2_dir = out_dir / "capsule_epoch_2"
         e2_dir.mkdir(parents=True, exist_ok=True)
@@ -428,6 +448,11 @@ def main() -> int:
         default="e2b",
         help="Provider label for this Host B run (e2b, codespaces, colab, chatgpt-linux, external)",
     )
+    ap.add_argument(
+        "--challenge-nonce",
+        default="",
+        help="Verifier-issued challenge nonce for challenge-response freshness proof",
+    )
     args = ap.parse_args()
 
     out_dir = Path(args.out).resolve()
@@ -471,7 +496,7 @@ def main() -> int:
         host_label = args.host_label
 
     # Phase 2: Host B on E2B
-    host_b = phase_host_b_e2b(host_a, out_dir / "host_b", host_label)
+    host_b = phase_host_b_e2b(host_a, out_dir / "host_b", host_label, challenge_nonce=args.challenge_nonce)
 
     # Phase 3: Verify after sandbox destroyed
     verify = phase_verify(host_a, host_b)

@@ -1,0 +1,14 @@
+# HDAR Task List
+
+## Epoch 1 (Host A)
+- [x] Create workspace
+- [x] Seal capsule
+
+## Epoch 2 (Host B)
+- [x] Execute pipeline
+- [x] Seal successor
+- [x] Update agent state
+
+## Epoch 3 (Next Host)
+- [ ] Restore E2 capsule
+- [ ] Continue work

@@ -270,6 +270,15 @@ def seal_epoch_2(
             return r.stdout.strip().split("\n") if r.returncode == 0 else []
         except Exception:
             return []
+    # GPU detection / emulation — extract GPU from CPU if no hardware GPU
+    gpu_manifest = None
+    try:
+        from gpu_emulator import GPUEmulator
+        _gpu = GPUEmulator()
+        gpu_manifest = _gpu.manifest()
+        print(f"  GPU: {_gpu.summary().split(chr(10))[0]}")
+    except Exception as e:
+        print(f"  GPU detection skipped: {e}")
     host_b_env_manifest = {
         "python_version": sys.version,
         "platform": platform.platform(),
@@ -278,6 +287,7 @@ def seal_epoch_2(
         "os_uname": list(platform.uname()),
         "hostname": platform.node(),
         "installed_packages": _pip_freeze(),
+        "gpu_manifest": gpu_manifest,
     }
     host_b_env_manifest_hash = sha256_bytes(canonical_json(host_b_env_manifest))
 
