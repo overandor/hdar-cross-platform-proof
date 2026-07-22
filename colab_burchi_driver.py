@@ -59,8 +59,10 @@ def build_colab_actions(
         # Step 1: Navigate to the GitHub-hosted notebook in Colab
         # This triggers Google login if not authenticated
         {"action": "goto", "intent": notebook_github_url, "wait": 8.0},
+        {"action": "digest"},
 
         # Step 2: Login flow — type email, wait for password page to load
+        # These fail silently if already logged in (no email field on Colab page)
         {"action": "type", "intent": "email input field", "value": google_email, "wait": 2.0},
         {"action": "click", "intent": "next continue button", "wait": 8.0},
 
@@ -74,6 +76,7 @@ def build_colab_actions(
         # Step 3: After login, navigate back to the notebook
         # (login may redirect to a different page)
         {"action": "goto", "intent": notebook_github_url, "wait": 10.0},
+        {"action": "digest"},
 
         # Wait for Colab to fully load the notebook and connect a runtime
         {"action": "wait", "wait": 10.0},
