@@ -1,0 +1,87 @@
+name: HDAR Colab Host B
+
+on:
+  workflow_dispatch:
+    inputs:
+      colab_gradio_url:
+        description: 'Gradio public URL from the Colab server notebook (or leave empty to use secret)'
+        required: false
+        default: ''
+
+jobs:
+  colab-host-b:
+    name: Host B on Google Colab (via Gradio)
+    runs-on: ubuntu-latest
+    env:
+      COLAB_GRADIO_URL: ${{ secrets.COLAB_GRADIO_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install cryptography gradio_client
+
+      - name: Build release bundle and extract runner
+        run: |
+          python3 release.py build --out /tmp/hdar_release_build
+          python3 release.py verify /tmp/hdar_release_build/release_bundle.tar.gz
+          mkdir -p /tmp/release_extracted
+          tar xzf /tmp/hdar_release_build/release_bundle.tar.gz -C /tmp/release_extracted
+          ls /tmp/release_extracted/host_a/
+
+      - name: Determine Colab URL
+        id: colab-url
+        run: |
+          URL="${{ github.event.inputs.colab_gradio_url }}"
+          if [ -z "$URL" ]; then
+            URL="$COLAB_GRADIO_URL"
+          fi
+          if [ -z "$URL" ]; then
+            echo "ERROR: No Colab Gradio URL provided. Set COLAB_GRADIO_URL secret or pass via input."
+            exit 1
+          fi
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Using Colab URL: $URL"
+
+      - name: Run Host B on Colab via Gradio API
+        run: |
+          python3 colab_client.py \
+            --url "${{ steps.colab-url.outputs.url }}" \
+            --runner /tmp/release_extracted/host_a/run_host_b.py \
+            --out evidence/colab
+
+      - name: Verify Colab evidence
+        run: |
+          python3 verify_all.py \
+            --host-a-dir . \
+            --host-b-report evidence/colab/host_b_report.json \
+            --e2-capsule evidence/colab/capsule_epoch_2
+
+      - name: Check platform separation
+        run: |
+          python3 -c "
+          import json
+          with open('evidence/colab/host_b_report.json') as f:
+              report = json.load(f)
+          platform = report.get('host_b_identity', {}).get('platform', '')
+          hostname = report.get('host_b_identity', {}).get('machine_hostname', '')
+          print(f'Colab platform: {platform}')
+          print(f'Colab hostname: {hostname}')
+          if 'Linux' not in platform:
+              print('WARNING: Expected Linux platform from Colab')
+          if not hostname:
+              print('WARNING: No hostname in report')
+          "
+
+      - name: Upload Colab evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: colab-host-b-evidence
+          path: |
+            evidence/colab/
+          retention-days: 90
