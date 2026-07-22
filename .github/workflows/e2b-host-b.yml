@@ -32,10 +32,15 @@ jobs:
 
       - name: Run E2B Host B
         run: |
+          rm -rf evidence/e2b
           python3 e2b_runner.py \
             --runner /tmp/release_extracted/host_a/run_host_b.py \
             --out evidence/e2b \
             --host-label "e2b-linux-sandbox"
+
+      - name: Copy host_a from release bundle for verification
+        run: |
+          cp -r /tmp/release_extracted/host_a evidence/e2b/host_a
 
       - name: Verify E2B evidence
         run: |
