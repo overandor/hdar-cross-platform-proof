@@ -1,0 +1,107 @@
+name: HDAR Host B (E2B Sandbox)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ─── Job 1: macOS — Build release bundle and run E2B sandbox ───
+  e2b-host-b:
+    name: E2B Sandbox Host B (macOS)
+    runs-on: macos-14
+    env:
+      E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install cryptography e2b requests
+
+      - name: Build release bundle
+        run: |
+          python3 release.py build --out /tmp/hdar_release_build
+          python3 release.py verify /tmp/hdar_release_build/release_bundle.tar.gz
+          mkdir -p /tmp/release_extracted
+          tar xzf /tmp/hdar_release_build/release_bundle.tar.gz -C /tmp/release_extracted
+
+      - name: Run E2B Host B
+        run: |
+          python3 e2b_runner.py \
+            --runner /tmp/release_extracted/host_a/run_host_b.py \
+            --out evidence/e2b \
+            --host-label "e2b-linux-sandbox"
+
+      - name: Verify E2B evidence
+        run: |
+          python3 verify_all.py \
+            --host-a-dir evidence/e2b/host_a \
+            --host-b-report evidence/e2b/host_b_report.json \
+            --e2-capsule evidence/e2b/capsule_epoch_2
+
+      - name: Upload E2B evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2b-host-b-evidence
+          path: evidence/e2b/
+          retention-days: 90
+
+  # ─── Job 2: Linux — independent verification ───
+  verify-e2b:
+    name: Verify E2B evidence (Linux)
+    runs-on: ubuntu-latest
+    needs: e2b-host-b
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install cryptography
+
+      - name: Download E2B evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: e2b-host-b-evidence
+          path: evidence/e2b/
+
+      - name: Verify E2B evidence
+        run: |
+          ls -la evidence/e2b/
+          python3 verify_all.py \
+            --host-a-dir evidence/e2b/host_a \
+            --host-b-report evidence/e2b/host_b_report.json \
+            --e2-capsule evidence/e2b/capsule_epoch_2
+
+      - name: Check platform separation
+        run: |
+          python3 -c "
+          import json
+          with open('evidence/e2b/host_b_report.json') as f:
+              report = json.load(f)
+          platform = report.get('host_b_identity', {}).get('platform', '')
+          hostname = report.get('host_b_identity', {}).get('machine_hostname', '')
+          print(f'E2B platform: {platform}')
+          print(f'E2B hostname: {hostname}')
+          if 'Linux' not in platform:
+              print('WARNING: Expected Linux platform from E2B')
+              exit(1)
+          print('Platform separation confirmed: macOS -> E2B Linux')
+          "
+
+      - name: Upload verification report
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2b-verification-report
+          path: |
+            evidence/e2b/
+            verifier_report_latest.json
+          retention-days: 90
