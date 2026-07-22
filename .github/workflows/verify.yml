@@ -60,6 +60,7 @@ jobs:
 
       - name: Run Rust verifier against all published evidence
         run: |
+          set -e
           for platform in evidence/codespaces evidence/github-actions/ubuntu-22.04 evidence/github-actions/ubuntu-24.04 evidence/github-actions/macos-14; do
             echo "--- $platform ---"
             ./rust_verifier/target/release/hdar-verify \
