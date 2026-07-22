@@ -1,6 +1,8 @@
 name: HDAR Colab Host B (Burchi)
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       google_email:
