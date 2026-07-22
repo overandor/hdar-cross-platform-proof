@@ -36,7 +36,7 @@ def main() -> int:
         return 1
 
     try:
-        from e2b import Sandbox
+        from e2b import Sandbox, FileType
     except ImportError:
         print("E2B package not installed. Install: pip install e2b", file=sys.stderr)
         print("Also set E2B_API_KEY environment variable.", file=sys.stderr)
@@ -119,7 +119,7 @@ def main() -> int:
             for entry in entries:
                 remote_full = f"{remote_path}/{entry.name}"
                 local_full = local_path / entry.name
-                if entry.is_dir:
+                if entry.type == FileType.DIR:
                     local_full.mkdir(parents=True, exist_ok=True)
                     downloaded += download_dir(remote_full, local_full)
                 else:
