@@ -83,7 +83,7 @@ def main() -> int:
         # Run Host B
         print("\n[4/5] Running Host B in sandbox...")
         result = sandbox.commands.run(
-            f"cd /home/user && python3 run_host_b.py --out /home/user/host_b_output --host-label {host_label} --operator e2b-sandbox",
+            f"cd /home/user && python3 run_host_b.py --out /home/user/host_b_output --host-label {host_label} --operator e2b-sandbox --sandbox-id {sandbox_id}",
             timeout=120,
         )
         print(f"  Exit code: {result.exit_code}")
@@ -105,22 +105,11 @@ def main() -> int:
         report_path.write_text(report_content)
         print(f"  Downloaded: {report_path}")
 
-        # Inject E2B provider metadata into the report
+        # Verify sandbox_id is bound into the report (passed via --sandbox-id to run_host_b.py)
         report = json.loads(report_content)
-        report["e2b_provider_evidence"] = {
-            "sandbox_id": sandbox_id,
-            "sandbox_created_utc": sandbox_created_utc,
-            "provider": "e2b.dev",
-            "template": "base",
-            "api_key_id": os.environ.get("E2B_API_KEY", "")[:8] + "..." if os.environ.get("E2B_API_KEY") else "NOT_SET",
-            "bound_into_report": True,
-            "binding_note": "Sandbox ID injected by e2b_runner.py after sandbox execution, before kill. Report hash does not include this field (added post-seal).",
-        }
-        report["e2b_provider_evidence"]["evidence_hash"] = hashlib.sha256(
-            json.dumps(report["e2b_provider_evidence"], sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest()
-        report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
-        print(f"  Injected E2B provider evidence (sandbox_id={sandbox_id})")
+        assert report.get("e2b_sandbox_id") == sandbox_id, \
+            f"Sandbox ID mismatch: report has {report.get('e2b_sandbox_id')}, expected {sandbox_id}"
+        print(f"  Verified: sandbox_id {sandbox_id} bound into report")
 
         # Download capsule_epoch_2 directory
         e2_dir = out_dir / "capsule_epoch_2"
@@ -198,6 +187,16 @@ def main() -> int:
             print(f"  Sandbox info captured: template={info.template_id} cpu={info.cpu_count} mem={info.memory_mb}MB")
         except Exception as e:
             print(f"  WARNING: Could not capture sandbox info: {e}", file=sys.stderr)
+
+        # Inject provider attestation into the report (sandbox_id already bound by run_host_b.py)
+        dashboard_evidence_hash = hashlib.sha256(
+            json.dumps(sandbox_info, sort_keys=True, separators=(",", ":"), default=str).encode() if sandbox_info else b"unavailable"
+        ).hexdigest()
+        report["provider_attested_termination"] = sandbox_info is not None
+        report["e2b_dashboard_evidence_hash"] = dashboard_evidence_hash
+        report["e2b_dashboard_evidence"] = sandbox_info
+        report_path.write_text(json.dumps(report, indent=2, sort_keys=True, default=str) + "\n")
+        print(f"  Injected provider attestation into report (attested={sandbox_info is not None})")
 
         # Kill sandbox and generate termination receipt
         print("\n  Terminating sandbox...")

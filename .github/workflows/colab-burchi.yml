@@ -25,7 +25,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install Python dependencies
-        run: pip install cryptography requests
+        run: pip install cryptography requests Pillow
 
       - name: Build release bundle
         run: |
@@ -55,7 +55,7 @@ jobs:
           fi
           echo "email=$EMAIL" >> $GITHUB_OUTPUT
 
-      - name: Run Burchi Colab driver
+      - name: Run Burchi Colab driver (with log capture)
         run: |
           python3 colab_burchi_driver.py \
             --burchi /tmp/burchi-bin \
@@ -63,7 +63,7 @@ jobs:
             --google-email "${{ steps.creds.outputs.email }}" \
             --google-password "$GOOGLE_PASSWORD" \
             --out evidence/colab \
-            --timeout 600
+            --timeout 600 2>&1 | tee evidence/colab_run.log
 
       - name: Extract tunnel URL and fetch evidence
         run: |
@@ -90,11 +90,53 @@ jobs:
               --timeout 600
           fi
 
+      - name: Render log screenshots
+        run: |
+          mkdir -p evidence/colab/screenshots
+          python3 render_log_screenshots.py --input evidence/colab_run.log --out-dir evidence/colab/screenshots --prefix colab_run
+          if [ -f evidence/colab/evidence_fetch.log ]; then
+            python3 render_log_screenshots.py --input evidence/colab/evidence_fetch.log --out-dir evidence/colab/screenshots --prefix colab_fetch
+          fi
+
+      - name: Generate attestation manifest
+        run: |
+          python3 -c "
+          import json, hashlib, os, platform
+          from datetime import datetime, timezone
+          attestation = {
+            'schema': 'hdar.ci-attestation/v1.0',
+            'generated_utc': datetime.now(timezone.utc).isoformat(),
+            'github_run_id': os.environ.get('GITHUB_RUN_ID', ''),
+            'github_run_number': os.environ.get('GITHUB_RUN_NUMBER', ''),
+            'github_sha': os.environ.get('GITHUB_SHA', ''),
+            'github_ref': os.environ.get('GITHUB_REF', ''),
+            'github_actor': os.environ.get('GITHUB_ACTOR', ''),
+            'runner_os': platform.platform(),
+            'runner_hostname': platform.node(),
+            'workflow': os.environ.get('GITHUB_WORKFLOW', ''),
+            'job': os.environ.get('GITHUB_JOB', ''),
+            'colab_provider': 'google-colab',
+            'browser_automation': 'burchi-wkwebview',
+            'evidence_files': [],
+          }
+          for root, dirs, files in os.walk('evidence/colab'):
+            for fn in files:
+              p = os.path.join(root, fn)
+              if os.path.isfile(p):
+                h = hashlib.sha256(open(p,'rb').read()).hexdigest()
+                attestation['evidence_files'].append({'path': p, 'sha256': h, 'size': os.path.getsize(p)})
+          with open('evidence/colab/attestation.json','w') as f:
+            json.dump(attestation, f, indent=2)
+          print(f'Attestation: {len(attestation["evidence_files"])} files fingerprinted')
+          "
+
       - name: Upload Colab evidence
         uses: actions/upload-artifact@v4
         with:
           name: colab-burchi-evidence
-          path: evidence/colab/
+          path: |
+            evidence/colab/
+            evidence/colab_run.log
           retention-days: 90
 
   # ─── Job 2: Linux — verify the evidence ───

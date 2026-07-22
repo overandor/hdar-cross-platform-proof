@@ -4,7 +4,7 @@
   "operator_reported_termination": true,
   "provider_attestation_note": "E2B SandboxInfo API provides sandbox metadata (sandbox_id, template, cpu, memory, started_at, end_at, state) as provider-side attestation. The sandbox_id iyrpblwcgocjfmjwin5bm is an E2B-issued identifier confirming the sandbox existed on E2B infrastructure. Platform evidence (Linux-6.1.158+-x86_64-with-glibc2.36, hostname e2b.local) is consistent with E2B Firecracker microVM infrastructure. This is API-sourced provider data, not operator self-report.",
   "provider_attested_termination": true,
-  "receipt_hash": "899ec0135c9322ec4c99ef096e35be23932bbd4ffdc3a06fdf7bb865ecf88885",
+  "receipt_hash": "bafd024874dbe1b23dd2bde7ba5aeadf9ff579d19b48952746d45a1bf956cd23",
   "sandbox_id": "iyrpblwcgocjfmjwin5bm",
   "sandbox_info": {
     "allow_internet_access": true,

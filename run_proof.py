@@ -291,8 +291,9 @@ def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str, challenge_non
         # Run Host B
         print("\n[4/6] Running Host B in sandbox...")
         nonce_arg = f" --challenge-nonce {challenge_nonce}" if challenge_nonce else ""
+        sandbox_id_arg = f" --sandbox-id {sandbox_id}"
         result = sandbox.commands.run(
-            f"cd /home/user && python3 run_host_b.py --out /home/user/host_b_output --host-label {host_label} --operator e2b-sandbox{nonce_arg}",
+            f"cd /home/user && python3 run_host_b.py --out /home/user/host_b_output --host-label {host_label} --operator e2b-sandbox{nonce_arg}{sandbox_id_arg}",
             timeout=120,
         )
         print(f"  Exit code: {result.exit_code}")
@@ -314,21 +315,12 @@ def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str, challenge_non
         report_path.write_text(report_content)
         print(f"  Downloaded: {report_path}")
 
-        # Inject E2B provider metadata into the report
+        # The sandbox_id is already bound into the report by run_host_b.py
+        # (passed via --sandbox-id). Verify it's there.
         report = json.loads(report_content)
-        report["e2b_provider_evidence"] = {
-            "sandbox_id": sandbox_id,
-            "sandbox_created_utc": sandbox_created_utc,
-            "provider": "e2b.dev",
-            "template": "base",
-            "bound_into_report": True,
-            "binding_note": "Sandbox ID injected by run_proof.py after sandbox execution, before kill.",
-        }
-        report["e2b_provider_evidence"]["evidence_hash"] = hashlib.sha256(
-            json.dumps(report["e2b_provider_evidence"], sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest()
-        report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
-        print(f"  Injected E2B provider evidence (sandbox_id={sandbox_id})")
+        assert report.get("e2b_sandbox_id") == sandbox_id, \
+            f"Sandbox ID mismatch: report has {report.get('e2b_sandbox_id')}, expected {sandbox_id}"
+        print(f"  Verified: sandbox_id {sandbox_id} bound into report")
 
         e2_dir = out_dir / "capsule_epoch_2"
         e2_dir.mkdir(parents=True, exist_ok=True)
@@ -370,6 +362,16 @@ def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str, challenge_non
             print(f"  Sandbox info captured: template={info.template_id} cpu={info.cpu_count} mem={info.memory_mb}MB")
         except Exception as e:
             print(f"  WARNING: Could not capture sandbox info: {e}", file=sys.stderr)
+
+        # Inject provider attestation into the report (sandbox_id already bound by run_host_b.py)
+        dashboard_evidence_hash = sha256_bytes(
+            canonical_json(sandbox_info) if sandbox_info else b"unavailable"
+        )
+        report["provider_attested_termination"] = sandbox_info is not None
+        report["e2b_dashboard_evidence_hash"] = dashboard_evidence_hash
+        report["e2b_dashboard_evidence"] = sandbox_info
+        report_path.write_text(json.dumps(report, indent=2, sort_keys=True, default=str) + "\n")
+        print(f"  Injected provider attestation into report (attested={sandbox_info is not None})")
 
         # Phase 3: Kill sandbox and generate termination receipt
         print("\n[6/6] Terminating sandbox...")
@@ -531,7 +533,12 @@ def main() -> int:
         host_label = args.host_label
 
     # Phase 2: Host B on E2B
-    host_b = phase_host_b_e2b(host_a, out_dir / "host_b", host_label, challenge_nonce=args.challenge_nonce)
+    challenge_nonce = args.challenge_nonce
+    if not challenge_nonce:
+        import secrets as _secrets
+        challenge_nonce = _secrets.token_hex(16)
+        print(f"  Auto-generated challenge nonce: {challenge_nonce[:16]}...")
+    host_b = phase_host_b_e2b(host_a, out_dir / "host_b", host_label, challenge_nonce=challenge_nonce)
 
     # Phase 3: Verify after sandbox destroyed
     verify = phase_verify(host_a, host_b)

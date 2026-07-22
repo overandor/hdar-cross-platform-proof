@@ -21,7 +21,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install cryptography e2b requests
+        run: pip install cryptography e2b requests Pillow
 
       - name: Build release bundle
         run: |
@@ -30,30 +30,70 @@ jobs:
           mkdir -p /tmp/release_extracted
           tar xzf /tmp/hdar_release_build/release_bundle.tar.gz -C /tmp/release_extracted
 
-      - name: Run E2B Host B
+      - name: Run E2B Host B (with log capture)
         run: |
           rm -rf evidence/e2b
           python3 e2b_runner.py \
             --runner /tmp/release_extracted/host_a/run_host_b.py \
             --out evidence/e2b \
-            --host-label "e2b-linux-sandbox"
+            --host-label "e2b-linux-sandbox" 2>&1 | tee evidence/e2b_run.log
 
       - name: Copy host_a from release bundle for verification
         run: |
           cp -r /tmp/release_extracted/host_a evidence/e2b/host_a
 
-      - name: Verify E2B evidence
+      - name: Verify E2B evidence (with log capture)
         run: |
           python3 verify_all.py \
             --host-a-dir evidence/e2b/host_a \
             --host-b-report evidence/e2b/host_b_report.json \
-            --e2-capsule evidence/e2b/capsule_epoch_2
+            --e2-capsule evidence/e2b/capsule_epoch_2 2>&1 | tee evidence/e2b_verify.log
+
+      - name: Render log screenshots
+        run: |
+          mkdir -p evidence/e2b/screenshots
+          python3 render_log_screenshots.py --input evidence/e2b_run.log --out-dir evidence/e2b/screenshots --prefix e2b_run
+          python3 render_log_screenshots.py --input evidence/e2b_verify.log --out-dir evidence/e2b/screenshots --prefix e2b_verify
+
+      - name: Generate attestation manifest
+        run: |
+          python3 -c "
+          import json, hashlib, os, platform, subprocess
+          from datetime import datetime, timezone
+          attestation = {
+            'schema': 'hdar.ci-attestation/v1.0',
+            'generated_utc': datetime.now(timezone.utc).isoformat(),
+            'github_run_id': os.environ.get('GITHUB_RUN_ID', ''),
+            'github_run_number': os.environ.get('GITHUB_RUN_NUMBER', ''),
+            'github_sha': os.environ.get('GITHUB_SHA', ''),
+            'github_ref': os.environ.get('GITHUB_REF', ''),
+            'github_actor': os.environ.get('GITHUB_ACTOR', ''),
+            'runner_os': platform.platform(),
+            'runner_hostname': platform.node(),
+            'workflow': os.environ.get('GITHUB_WORKFLOW', ''),
+            'job': os.environ.get('GITHUB_JOB', ''),
+            'e2b_provider': 'e2b.dev',
+            'evidence_files': [],
+          }
+          for root, dirs, files in os.walk('evidence/e2b'):
+            for fn in files:
+              p = os.path.join(root, fn)
+              if os.path.isfile(p):
+                h = hashlib.sha256(open(p,'rb').read()).hexdigest()
+                attestation['evidence_files'].append({'path': p, 'sha256': h, 'size': os.path.getsize(p)})
+          with open('evidence/e2b/attestation.json','w') as f:
+            json.dump(attestation, f, indent=2)
+          print(f'Attestation: {len(attestation["evidence_files"])} files fingerprinted')
+          "
 
       - name: Upload E2B evidence
         uses: actions/upload-artifact@v4
         with:
           name: e2b-host-b-evidence
-          path: evidence/e2b/
+          path: |
+            evidence/e2b/
+            evidence/e2b_run.log
+            evidence/e2b_verify.log
           retention-days: 90
 
   # ─── Job 2: Linux — independent verification ───
