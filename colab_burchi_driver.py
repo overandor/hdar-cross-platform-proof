@@ -42,42 +42,39 @@ def build_colab_actions(
     google_email: str,
     google_password: str,
     out_dir: str,
+    notebook_github_url: str = "",
 ) -> list[dict]:
     """Build the Burchi JSON action script for Colab automation.
 
-    Burchi can: navigate, find elements by meaning, type, click, extract text.
-    Burchi cannot: handle native file upload dialogs or download files from
-    Colab's remote VM filesystem.
-
     Strategy: Burchi handles the login flow (semantic, self-healing).
+    Then opens a GitHub-hosted notebook via Colab's /github/ URL.
     The notebook starts an ngrok tunnel and prints the tunnel URL in cell
     output. Burchi extracts the URL from the page via digest/markdown.
     CI then downloads evidence directly from the tunnel URL.
     """
+    if not notebook_github_url:
+        notebook_github_url = "https://colab.research.google.com/github/overandor/hdar-cross-platform-proof/blob/main/hdar_host_b_colab.ipynb"
+
     actions = [
-        # Step 1: Navigate to Colab
-        {"action": "goto", "intent": "https://colab.research.google.com", "wait": 3.0},
+        # Step 1: Navigate to Colab (triggers login if not authenticated)
+        {"action": "goto", "intent": notebook_github_url, "wait": 5.0},
         {"action": "digest"},
 
-        # Step 2: Login flow — semantic, survives UI changes
-        {"action": "find", "intent": "sign in login button"},
-        {"action": "click", "intent": "sign in", "wait": 3.0},
-
-        # Google login page — type email
+        # Step 2: Login flow — only needed if redirected to Google sign-in
         {"action": "type", "intent": "email input field", "value": google_email},
-        {"action": "click", "intent": "next continue button", "wait": 3.0},
+        {"action": "click", "intent": "next continue button", "wait": 5.0},
 
         # Google login — type password
         {"action": "type", "intent": "password input field", "value": google_password},
-        {"action": "click", "intent": "next sign in button", "wait": 5.0},
+        {"action": "click", "intent": "next sign in button", "wait": 8.0},
 
-        # Step 3: After login, open a new notebook
-        {"action": "goto", "intent": "https://colab.research.google.com/#create=true", "wait": 5.0},
+        # Step 3: After login, Colab should load the notebook from GitHub
+        {"action": "goto", "intent": notebook_github_url, "wait": 8.0},
+        {"action": "digest"},
 
-        # Step 4: Run all cells (notebook is pre-loaded via upload or paste)
-        {"action": "find", "intent": "runtime run all"},
-        {"action": "click", "intent": "runtime menu", "wait": 1.0},
-        {"action": "click", "intent": "run all cells", "wait": 60.0},
+        # Step 4: Run all cells via Runtime menu
+        {"action": "click", "intent": "runtime menu", "wait": 2.0},
+        {"action": "click", "intent": "run all cells run all", "wait": 90.0},
 
         # Step 5: Extract page content — the tunnel URL will be in cell output
         {"action": "markdown"},
@@ -128,6 +125,7 @@ def main() -> int:
     ap.add_argument("--google-password", required=True, help="Google account password")
     ap.add_argument("--out", default="./evidence/colab", help="Output directory")
     ap.add_argument("--timeout", type=int, default=300, help="Burchi script timeout")
+    ap.add_argument("--notebook-url", default="", help="Colab URL for GitHub-hosted notebook")
     args = ap.parse_args()
 
     burchi_bin = Path(args.burchi).resolve()
@@ -149,6 +147,7 @@ def main() -> int:
         args.google_email,
         args.google_password,
         str(out_dir),
+        notebook_github_url=args.notebook_url,
     )
     actions_json = json.dumps(actions, indent=2)
     print(f"Built {len(actions)} Burchi actions for Colab automation")
