@@ -220,10 +220,28 @@ jobs:
             fi
           done
           echo "Verifying attestations for evidence archives: $ARCHIVE_ARGS"
-          python3 verify_attestations.py \
-            --repository "${{ github.repository }}" \
-            $ARCHIVE_ARGS \
-            --extract-metadata || echo "WARNING: Attestation verification failed (may need workflow run to complete first)"
+          # Retry up to 3 times with 10s delay — attestations may take a
+          # moment to propagate after the host-b-matrix jobs complete.
+          # But DO NOT swallow the failure — if attestation verification
+          # fails, the CI step must fail (no false green).
+          for attempt in 1 2 3; do
+            echo "Attempt $attempt/3..."
+            if python3 verify_attestations.py \
+              --repository "${{ github.repository }}" \
+              $ARCHIVE_ARGS \
+              --extract-metadata; then
+              echo "Attestation verification passed."
+              break
+            else
+              if [ $attempt -eq 3 ]; then
+                echo "ERROR: Attestation verification failed after 3 attempts."
+                echo "This means evidence archives are not properly attested."
+                exit 1
+              fi
+              echo "Retrying in 10s..."
+              sleep 10
+            fi
+          done
 
       - name: Run reproduction matrix verifier
         env:
