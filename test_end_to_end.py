@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""HDAR End-to-End Pipeline Test.
+"""HDAR End-to-End Pipeline Test (cryptographic chain only — NOT cross-platform).
 
-This test exercises the FULL pipeline — not just verification of pre-committed
-evidence. It:
+This test exercises the cryptographic pipeline — not just verification of
+pre-committed evidence. It:
 
 1. Runs host_a_seal.py to generate a FRESH Epoch 1 capsule with a new keypair
 2. Runs the generated run_host_b.py to continue E1 → E2
@@ -16,9 +16,19 @@ This catches defects that static-evidence verification cannot:
 - Content block corruption during the pipeline
 - Receipt hash computation errors
 
-Platform separation (Host A ≠ Host B) is EXPECTED TO FAIL when both run on
-the same machine. The test explicitly excludes those 2 checks and verifies
-the remaining 29 cryptographic/structural checks pass.
+IMPORTANT — what this test does NOT prove:
+  This test runs Host A and Host B on the SAME machine. It does NOT prove
+  cross-platform continuation. Platform separation (Host A ≠ Host B) will
+  FAIL because both run locally. This is expected and excluded from the
+  pass/fail verdict.
+
+  Cross-platform continuation requires Host B to run on a genuinely
+  different platform — Colab, Codespaces, HuggingFace, or E2B Sandbox.
+  That is tested by the reproduction_matrix.yml workflow on real
+  GitHub Actions runners, not by this local test.
+
+  This test proves: the cryptographic chain mechanics work end-to-end.
+  This test does NOT prove: cross-platform continuation.
 
 Usage:
     python3 test_end_to_end.py
@@ -195,12 +205,17 @@ def main() -> int:
         print("  All critical cryptographic checks passed on fresh evidence.")
         print()
         print("=" * 70)
-        print("END-TO-END PIPELINE TEST: PASSED")
+        print("CRYPTOGRAPHIC CHAIN TEST: PASSED (same-machine — NOT cross-platform)")
         print("=" * 70)
         print()
-        print(f"  Fresh E1 sealed, E2 continued, and verified successfully.")
+        print(f"  Fresh E1 sealed, E2 continued, cryptographic chain verified.")
         print(f"  {len(passes)}/{len(passes) + len(failures)} checks passed")
         print(f"  ({len(platform_failures)} platform-separation checks skipped — same machine)")
+        print()
+        print("  NOTE: This does NOT prove cross-platform continuation.")
+        print("  Host B ran on the same machine as Host A.")
+        print("  Cross-platform proof requires Host B on Colab/Codespaces/HF/E2B.")
+        print("  Use reproduction_matrix.yml for real cross-platform verification.")
         print()
         return 0
 
