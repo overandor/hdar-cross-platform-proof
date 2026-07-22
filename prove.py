@@ -31,6 +31,15 @@ EVIDENCE = [
     ("evidence/github-actions/macos-14/host_b_report.json", "evidence/github-actions/macos-14/capsule_epoch_2"),
 ]
 
+# E2B live evidence — separate because it has its own host_a (fresh E1)
+# and 34 checks (21 base + 13 E2B-specific: sandbox termination receipt,
+# provider attestation, semantic continuation, source-commit binding).
+E2B_EVIDENCE = (
+    "evidence/e2b/host_a",
+    "evidence/e2b/host_b_report.json",
+    "evidence/e2b/capsule_epoch_2",
+)
+
 
 def run_python_verifier() -> tuple[int, str]:
     """Run the Python verifier against all published evidence.
@@ -47,6 +56,32 @@ def run_python_verifier() -> tuple[int, str]:
 
     print("=" * 70)
     print("Python Verifier (verify_all.py)")
+    print("=" * 70)
+    result = subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
+    print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+    return result.returncode, result.stdout
+
+
+def run_e2b_verifier() -> tuple[int, str]:
+    """Run the Python verifier against E2B live evidence.
+    This evidence has its own host_a (fresh E1 from the E2B run) and
+    34 checks including sandbox termination, provider attestation, and
+    semantic continuation.
+    Returns (exit_code, stdout_output)."""
+    host_a_dir, report, capsule = E2B_EVIDENCE
+    cmd = [
+        sys.executable,
+        str(REPO_ROOT / "verify_all.py"),
+        "--host-a-dir", str(REPO_ROOT / host_a_dir),
+        "--host-b-report", str(REPO_ROOT / report),
+        "--e2-capsule", str(REPO_ROOT / capsule),
+    ]
+
+    print()
+    print("=" * 70)
+    print("E2B Live Evidence (provider-attested, 34 checks)")
     print("=" * 70)
     result = subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
     print(result.stdout, end="")
@@ -130,6 +165,11 @@ def main() -> int:
         print("\nPython verifier FAILED — aborting")
         return py_code
 
+    e2b_code, e2b_output = run_e2b_verifier()
+    if e2b_code != 0:
+        print("\nE2B evidence verification FAILED — aborting")
+        return e2b_code
+
     rust_code, rust_output = 0, ""
     if not args.python_only:
         rust_code, rust_output = run_rust_verifier()
@@ -139,6 +179,7 @@ def main() -> int:
 
     # Extract actual check counts from verifier output (not hardcoded)
     py_passed, py_total = extract_check_counts(py_output)
+    e2b_passed, e2b_total = extract_check_counts(e2b_output)
     rust_passed, rust_total = extract_check_counts(rust_output)
 
     print()
@@ -147,14 +188,22 @@ def main() -> int:
     print("=" * 70)
     if args.python_only:
         py_str = f"PASS ({py_passed}/{py_total})" if py_total > 0 else "PASS (count unknown)"
-        print(f"  Python verifier: {py_str}")
+        e2b_str = f"PASS ({e2b_passed}/{e2b_total})" if e2b_total > 0 else "PASS (count unknown)"
+        print(f"  Python verifier (4 published): {py_str}")
+        print(f"  E2B live evidence (34 checks):  {e2b_str}")
+        print(f"  Total:                          {py_passed + e2b_passed}/{py_total + e2b_total}")
         print("  Rust verifier: SKIPPED (--python-only)")
     else:
         py_str = f"PASS ({py_passed}/{py_total})" if py_total > 0 else "PASS (count unknown)"
+        e2b_str = f"PASS ({e2b_passed}/{e2b_total})" if e2b_total > 0 else "PASS (count unknown)"
         rust_str = f"PASS ({rust_passed}/{rust_total})" if rust_total > 0 else "PASS (count unknown)"
-        print(f"  Python verifier: {py_str}")
-        print(f"  Rust verifier: {rust_str}")
-        # Verify both verifiers checked the same number of checks
+        print(f"  Python verifier (4 published): {py_str}")
+        print(f"  E2B live evidence (34 checks):  {e2b_str}")
+        print(f"  Rust verifier (4 published):    {rust_str}")
+        total_py = py_passed + e2b_passed
+        total_all = py_total + e2b_total + rust_total
+        print(f"  Total:                          {total_py + rust_passed}/{total_all}")
+        # Verify both verifiers checked the same number of checks on published evidence
         if py_total > 0 and rust_total > 0 and py_total != rust_total:
             print(f"  WARNING: check count mismatch — Python={py_total} Rust={rust_total}")
             print("  Implementation independence: CHECK COUNT MISMATCH")
