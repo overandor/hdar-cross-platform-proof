@@ -111,7 +111,7 @@ def test_1_corrupt_e1_manifest_hash(base: Path) -> tuple[str, Path, Path, Path, 
     original = manifest["manifest_hash"]
     manifest["manifest_hash"] = original[:10] + ("0" if original[10] != "0" else "1") + original[11:]
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
-    return "Corrupt E1 manifest hash", host_a, report, e2, "manifest hash mismatch"
+    return "Corrupt E1 manifest hash", host_a, report, e2, "E1 manifest hash valid"
 
 
 def test_2_corrupt_e1_owner_signature(base: Path) -> tuple[str, Path, Path, Path, str]:
@@ -122,7 +122,7 @@ def test_2_corrupt_e1_owner_signature(base: Path) -> tuple[str, Path, Path, Path
     sig = manifest["owner_signature"]
     manifest["owner_signature"] = sig[:10] + ("0" if sig[10] != "0" else "1") + sig[11:]
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
-    return "Corrupt E1 owner signature", host_a, report, e2, "Ed25519 signature invalid"
+    return "Corrupt E1 owner signature", host_a, report, e2, "E1 Ed25519 owner signature valid"
 
 
 def test_3_corrupt_e2_manifest_hash(base: Path) -> tuple[str, Path, Path, Path, str]:
@@ -133,7 +133,7 @@ def test_3_corrupt_e2_manifest_hash(base: Path) -> tuple[str, Path, Path, Path, 
     original = manifest["manifest_hash"]
     manifest["manifest_hash"] = original[:10] + ("0" if original[10] != "0" else "1") + original[11:]
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
-    return "Corrupt E2 manifest hash", host_a, report, e2, "manifest hash mismatch"
+    return "Corrupt E2 manifest hash", host_a, report, e2, "E2 manifest hash valid"
 
 
 def test_4_corrupt_e2_content_block(base: Path) -> tuple[str, Path, Path, Path, str]:
@@ -149,7 +149,7 @@ def test_4_corrupt_e2_content_block(base: Path) -> tuple[str, Path, Path, Path, 
         if len(data) > 0:
             data[0] ^= 0xFF  # Flip all bits in first byte
             block_path.write_bytes(bytes(data))
-    return "Corrupt E2 content block", host_a, report, e2, "content blocks corrupt"
+    return "Corrupt E2 content block", host_a, report, e2, "E2 content blocks all valid"
 
 
 def test_5_break_lineage(base: Path) -> tuple[str, Path, Path, Path, str]:
@@ -199,7 +199,7 @@ def test_8_remove_content_block(base: Path) -> tuple[str, Path, Path, Path, str]
     block_path = e2 / "blocks" / digest[:2] / digest
     if block_path.exists():
         block_path.unlink()
-    return "Remove E2 content block", host_a, report, e2, "content blocks missing"
+    return "Remove E2 content block", host_a, report, e2, "E2 content blocks all valid"
 
 
 def test_9_fabricate_output_hash(base: Path) -> tuple[str, Path, Path, Path, str]:
@@ -281,9 +281,12 @@ def main() -> int:
 
             status = "REJECTED" if rejected else "ACCEPTED"
             keyword_status = "matched" if keyword_found else "not matched"
-            print(f"  [{'PASS' if rejected else 'FAIL!!!'}] {name}")
+            test_pass = rejected and keyword_found
+            print(f"  [{'PASS' if test_pass else 'FAIL!!!'}] {name}")
             print(f"           Verifier exit code: {code} ({status})")
             print(f"           Expected failure keyword '{expected_keyword}': {keyword_status}")
+            if rejected and not keyword_found:
+                print(f"           WARNING: verifier rejected but for wrong reason — expected check did not fire")
             print()
 
             results.append({
@@ -294,7 +297,7 @@ def main() -> int:
                 "exit_code": code,
             })
 
-            if not rejected:
+            if not rejected or not keyword_found:
                 all_rejected = False
 
     # Summary
@@ -303,10 +306,12 @@ def main() -> int:
     print("=" * 70)
     rejected_count = sum(1 for r in results if r["rejected"])
     accepted_count = sum(1 for r in results if not r["rejected"])
+    keyword_mismatch_count = sum(1 for r in results if r["rejected"] and not r["keyword_found"])
     print(f"  Tests: {len(results)}")
     print(f"  Tampered evidence correctly REJECTED: {rejected_count}")
     print(f"  Tampered evidence INCORRECTLY ACCEPTED: {accepted_count}")
-    print(f"  Verdict: {'ALL TAMPERED EVIDENCE REJECTED — verifier is robust' if all_rejected else 'SECURITY GAP — some tampered evidence passed the verifier'}")
+    print(f"  Rejected for wrong reason (keyword mismatch): {keyword_mismatch_count}")
+    print(f"  Verdict: {'ALL TAMPERED EVIDENCE REJECTED — verifier is robust' if all_rejected else 'SECURITY GAP — some tampered evidence passed or was rejected for the wrong reason'}")
     print()
     return 0 if all_rejected else 1
 
