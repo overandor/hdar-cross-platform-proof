@@ -65,6 +65,10 @@ jobs:
             --out evidence/colab \
             --timeout 600 2>&1 | tee evidence/colab_run.log
 
+      - name: Copy host_a from release bundle for verification
+        run: |
+          cp -r /tmp/release_extracted/host_a evidence/colab/host_a
+
       - name: Extract tunnel URL and fetch evidence
         run: |
           TUNNEL_URL=$(python3 -c "
@@ -106,13 +110,18 @@ jobs:
             --provider "google-colab" \
             --browser "burchi-wkwebview"
 
+      - name: Stage Colab evidence for upload
+        run: |
+          mkdir -p /tmp/colab_artifact
+          cp -r evidence/colab/* /tmp/colab_artifact/
+          cp evidence/colab_run.log /tmp/colab_artifact/
+          ls -la /tmp/colab_artifact/
+
       - name: Upload Colab evidence
         uses: actions/upload-artifact@v4
         with:
           name: colab-burchi-evidence
-          path: |
-            evidence/colab/
-            evidence/colab_run.log
+          path: /tmp/colab_artifact/
           retention-days: 90
 
   # ─── Job 2: Linux — verify the evidence ───
@@ -131,11 +140,13 @@ jobs:
       - name: Install dependencies
         run: pip install cryptography
 
+      - name: Remove stale evidence and download Colab evidence
+        run: rm -rf evidence/colab
       - name: Download Colab evidence
         uses: actions/download-artifact@v4
         with:
           name: colab-burchi-evidence
-          path: evidence/colab/
+          path: evidence/colab
 
       - name: Verify Colab evidence
         run: |
@@ -145,7 +156,7 @@ jobs:
             exit 1
           fi
           python3 verify_all.py \
-            --host-a-dir . \
+            --host-a-dir evidence/colab/host_a \
             --host-b-report evidence/colab/host_b_report.json \
             --e2-capsule evidence/colab/capsule_epoch_2
 
@@ -163,11 +174,14 @@ jobs:
               print('WARNING: Expected Linux platform from Colab')
           "
 
+      - name: Stage Colab verification report
+        run: |
+          mkdir -p /tmp/colab_verify_artifact
+          cp -r evidence/colab/* /tmp/colab_verify_artifact/
+          cp verifier_report_latest.json /tmp/colab_verify_artifact/ 2>/dev/null || true
       - name: Upload verification report
         uses: actions/upload-artifact@v4
         with:
           name: colab-verification-report
-          path: |
-            evidence/colab/
-            verifier_report_latest.json
+          path: /tmp/colab_verify_artifact/
           retention-days: 90

@@ -62,14 +62,19 @@ jobs:
             --out evidence/e2b/attestation.json \
             --provider "e2b.dev"
 
+      - name: Stage evidence for upload
+        run: |
+          mkdir -p /tmp/e2b_artifact
+          cp -r evidence/e2b/* /tmp/e2b_artifact/
+          cp evidence/e2b_run.log /tmp/e2b_artifact/
+          cp evidence/e2b_verify.log /tmp/e2b_artifact/
+          ls -la /tmp/e2b_artifact/
+
       - name: Upload E2B evidence
         uses: actions/upload-artifact@v4
         with:
           name: e2b-host-b-evidence
-          path: |
-            evidence/e2b/
-            evidence/e2b_run.log
-            evidence/e2b_verify.log
+          path: /tmp/e2b_artifact/
           retention-days: 90
 
   # ─── Job 2: Linux — independent verification ───
@@ -88,11 +93,13 @@ jobs:
       - name: Install dependencies
         run: pip install cryptography
 
+      - name: Remove stale evidence and download E2B evidence
+        run: rm -rf evidence/e2b
       - name: Download E2B evidence
         uses: actions/download-artifact@v4
         with:
           name: e2b-host-b-evidence
-          path: evidence/e2b/
+          path: evidence/e2b
 
       - name: Verify E2B evidence
         run: |
@@ -118,11 +125,14 @@ jobs:
           print('Platform separation confirmed: macOS -> E2B Linux')
           "
 
+      - name: Stage verification report
+        run: |
+          mkdir -p /tmp/e2b_verify_artifact
+          cp -r evidence/e2b/* /tmp/e2b_verify_artifact/
+          cp verifier_report_latest.json /tmp/e2b_verify_artifact/ 2>/dev/null || true
       - name: Upload verification report
         uses: actions/upload-artifact@v4
         with:
           name: e2b-verification-report
-          path: |
-            evidence/e2b/
-            verifier_report_latest.json
+          path: /tmp/e2b_verify_artifact/
           retention-days: 90
