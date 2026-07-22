@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       google_email:
-        description: 'Google account email for Colab'
-        required: true
+        description: 'Optional Google account email override; defaults to GOOGLE_EMAIL secret'
+        required: false
         default: ''
 
 jobs:

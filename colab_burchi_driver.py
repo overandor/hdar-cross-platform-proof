@@ -77,6 +77,7 @@ def build_colab_actions(
         # (login may redirect to a different page)
         {"action": "goto", "intent": notebook_github_url, "wait": 10.0},
         {"action": "digest"},
+        {"action": "screenshot", "value": str(Path(out_dir) / "colab_notebook_loaded.png")},
 
         # Wait for Colab to fully load the notebook and connect a runtime
         {"action": "wait", "wait": 10.0},
@@ -89,6 +90,7 @@ def build_colab_actions(
         # Step 5: Wait for cells to finish executing
         # The notebook installs deps, runs the protocol, starts ngrok
         {"action": "wait", "wait": 30.0},
+        {"action": "screenshot", "value": str(Path(out_dir) / "colab_after_run_all.png")},
 
         # Step 6: Extract page content — the tunnel URL will be in cell output
         {"action": "markdown", "wait": 5.0},
