@@ -15,6 +15,7 @@ jobs:
   colab-burchi:
     name: Burchi → Colab (macOS)
     runs-on: macos-14
+    timeout-minutes: 15
     env:
       GOOGLE_EMAIL: ${{ secrets.GOOGLE_EMAIL }}
       GOOGLE_PASSWORD: ${{ secrets.GOOGLE_PASSWORD }}
@@ -59,13 +60,13 @@ jobs:
 
       - name: Run Burchi Colab driver (with log capture)
         run: |
-          python3 colab_burchi_driver.py \
+          timeout --signal=KILL 540 python3 colab_burchi_driver.py \
             --burchi /tmp/burchi-bin \
             --runner /tmp/release_extracted/host_a/run_host_b.py \
             --google-email "${{ steps.creds.outputs.email }}" \
             --google-password "$GOOGLE_PASSWORD" \
             --out evidence/colab \
-            --timeout 600 2>&1 | tee evidence/colab_run.log
+            --timeout 500 2>&1 | tee evidence/colab_run.log
 
       - name: Copy host_a from release bundle for verification
         run: |
