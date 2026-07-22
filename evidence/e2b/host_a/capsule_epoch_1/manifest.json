@@ -1,0 +1,54 @@
+{
+  "agent_id": "hdar-cross-platform-agent",
+  "continuation_point": "Host A sealed epoch 1; Host B must restore, execute pipeline, seal epoch 2.",
+  "created_at": 1784743451.431642,
+  "environment_manifest_hash": "b9f9c004c0abb56bd7f850340a57a1c7691a13dd594f84c322f298e01e845ce5",
+  "epoch": 1,
+  "manifest_hash": "ff4e7adacc1d143e66f784399c349ce085ac2f926a1a1da502bdc291f25b08d4",
+  "objective": "Cross-platform HDAR continuation proof",
+  "owner_public_key": "d76415e64342c89b43b3ef6f9503fc85338d104a42d571a95d38f70e57e70a7e",
+  "owner_signature": "7822a00daca047c9a087bf3ad45c60a0558c5bdd01dad6c543cb05b9a061da0be36745212320d1775530a81d1ed389fbfb183d9855021a2acc59a7c24d098704",
+  "owner_signature_algorithm": "ed25519",
+  "parent_manifest_hash": null,
+  "protocol_version": "hdar-canonical/v1.0",
+  "receipt_hash": "5a50d2540b169e08cae1dce7fbe596a0af6429cfefb31376ba24d20e2f070182",
+  "schema": "hdar.transport-capsule/v0.1",
+  "source_host_label": "host-a-local-mac",
+  "source_host_platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "workspace_manifest": {
+    "files": [
+      {
+        "mode": 420,
+        "rel_path": "agent_state.json",
+        "sha256": "62f667e222275d44bc2bca50a0e3158f7d312dd6abd79c5e7e6189ff146b0db2",
+        "size": 384
+      },
+      {
+        "mode": 420,
+        "rel_path": "data/input_records.jsonl",
+        "sha256": "cefc1c255a67a3c52ed5ef19974ebb87edd1def50fb7045adef2390238d5fcd3",
+        "size": 4162
+      },
+      {
+        "mode": 420,
+        "rel_path": "progress.log",
+        "sha256": "8fc296ad3376ef7732069ec5ecf3802e9131bf68422812005b4e24d0b222875c",
+        "size": 93
+      },
+      {
+        "mode": 420,
+        "rel_path": "src/worker.py",
+        "sha256": "6ca43441762bdd5cc63a728b2a277a4976f5ff92d391d94c9046a5d49b21e564",
+        "size": 5180
+      },
+      {
+        "mode": 420,
+        "rel_path": "todo.md",
+        "sha256": "36a1743fd2b4c003a581775fd333cd028e7674aaf9356b81d4a6f0e78f9eee95",
+        "size": 145
+      }
+    ],
+    "root_hash": "9adaf181aacbfa9c971f3be4226a97db6bfb20a0b2d635208d067ee115bfdf4e",
+    "total_size": 9964
+  }
+}

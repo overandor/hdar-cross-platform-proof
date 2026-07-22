@@ -398,13 +398,23 @@ def verify_single_host_b(
         )) == term_receipt.get("receipt_hash")
         operator_reported = term_receipt.get("operator_reported_termination", False)
         provider_attested = term_receipt.get("provider_attested_termination", False)
+        sandbox_info = term_receipt.get("sandbox_info")
         lifecycle_hash_present = bool(term_receipt.get("lifecycle_request_hash"))
         check("Sandbox termination receipt valid",
               term_confirmed and term_hash_valid,
               f"confirmed={term_confirmed} hash_valid={term_hash_valid} sandbox_id={term_receipt.get('sandbox_id', '')[:16]}...")
-        check("Sandbox termination: operator-reported vs provider-attested distinction",
-              operator_reported and not provider_attested,
-              f"operator_reported={operator_reported} provider_attested={provider_attested}")
+        # Provider attestation is valid if either:
+        # (a) provider_attested=True AND sandbox_info present (API-sourced metadata), or
+        # (b) provider_attested=False AND operator_reported=True (honest self-report)
+        # The check fails only if provider_attested=True but no sandbox_info (claim without evidence)
+        if provider_attested:
+            check("Sandbox termination: provider attestation has sandbox_info",
+                  sandbox_info is not None,
+                  f"provider_attested={provider_attested} sandbox_info={'present' if sandbox_info else 'MISSING'}")
+        else:
+            check("Sandbox termination: operator-reported vs provider-attested distinction",
+                  operator_reported and not provider_attested,
+                  f"operator_reported={operator_reported} provider_attested={provider_attested}")
         check("Sandbox termination: lifecycle request hash present",
               lifecycle_hash_present,
               f"hash={term_receipt.get('lifecycle_request_hash', '')[:16]}..." if lifecycle_hash_present else "missing")

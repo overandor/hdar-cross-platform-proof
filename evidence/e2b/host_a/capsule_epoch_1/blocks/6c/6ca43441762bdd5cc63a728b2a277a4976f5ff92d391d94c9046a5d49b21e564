@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Multi-stage analysis pipeline — Host B continuation task."""
+import json, sys, hashlib
+from pathlib import Path
+from collections import defaultdict
+
+def canonical_json(data):
+    return json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+def sha256_bytes(data) -> str:
+    if isinstance(data, str):
+        data = data.encode()
+    return hashlib.sha256(data).hexdigest()
+
+def stage_parse(workspace):
+    input_path = workspace / "data" / "input_records.jsonl"
+    records = [json.loads(l) for l in input_path.read_text().strip().split("\n") if l.strip()]
+    result = {"stage": "parse", "records_loaded": len(records), "first_id": records[0]["id"], "last_id": records[-1]["id"]}
+    result["parent_hash"] = "0000000000000000000000000000000000000000000000000000000000000000"
+    return result
+
+def stage_filter(workspace, records, parent_hash):
+    valid, rejected = [], []
+    for r in records:
+        if not r.get("id") or not r.get("category") or "value" not in r:
+            rejected.append({"id": r.get("id", "unknown"), "reason": "missing_fields"})
+        elif not isinstance(r["value"], (int, float)) or r["value"] < 0:
+            rejected.append({"id": r["id"], "reason": "invalid_value"})
+        else:
+            valid.append(r)
+    return {"stage": "filter", "parent_hash": parent_hash, "input_count": len(records), "valid_count": len(valid), "rejected_count": len(rejected), "rejected": rejected}
+
+def stage_aggregate(workspace, records, parent_hash):
+    by_cat = defaultdict(list)
+    for r in records:
+        by_cat[r["category"]].append(r["value"])
+    stats = {}
+    for cat, vals in sorted(by_cat.items()):
+        stats[cat] = {"count": len(vals), "sum": round(sum(vals), 4), "mean": round(sum(vals)/len(vals), 4), "min": min(vals), "max": max(vals), "median": sorted(vals)[len(vals)//2]}
+    return {"stage": "aggregate", "parent_hash": parent_hash, "categories": list(sorted(by_cat.keys())), "stats": stats}
+
+def stage_classify(workspace, records, stats, parent_hash):
+    tiers = {"critical": [], "high": [], "medium": [], "low": []}
+    for r in records:
+        cm = stats[r["category"]]["mean"]
+        ratio = r["value"] / cm if cm > 0 else 0
+        if ratio >= 2.0: tiers["critical"].append(r["id"])
+        elif ratio >= 1.5: tiers["high"].append(r["id"])
+        elif ratio >= 0.5: tiers["medium"].append(r["id"])
+        else: tiers["low"].append(r["id"])
+    return {"stage": "classify", "parent_hash": parent_hash, "tier_counts": {k: len(v) for k, v in tiers.items()}, "tier_members": tiers}
+
+def stage_report(ws, pr, fr, ar, cr, parent_hash):
+    return {"stage": "report", "parent_hash": parent_hash, "pipeline": "multi_stage_analysis_pipeline",
+            "summary": {"total_input": pr["records_loaded"], "valid_records": fr["valid_count"], "rejected": fr["rejected_count"], "categories": ar["categories"], "tier_distribution": cr["tier_counts"]},
+            "category_stats": ar["stats"], "tier_members": cr["tier_members"], "metadata": {"stages_completed": 5, "version": "1.1"}}
+
+def main():
+    workspace = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
+    out = workspace / "output"
+    out.mkdir(parents=True, exist_ok=True)
+    pr = stage_parse(workspace)
+    parse_hash = sha256_bytes(canonical_json(pr).encode())
+    pr["stage_hash"] = parse_hash
+    (out / "stage_parse.json").write_text(json.dumps(pr, indent=2, sort_keys=True) + "\n")
+    print(f"Stage 1 (parse): {pr['records_loaded']} records loaded")
+    input_path = workspace / "data" / "input_records.jsonl"
+    records = [json.loads(l) for l in input_path.read_text().strip().split("\n") if l.strip()]
+    fr = stage_filter(workspace, records, parse_hash)
+    filter_hash = sha256_bytes(canonical_json(fr))
+    fr["stage_hash"] = filter_hash
+    (out / "stage_filter.json").write_text(json.dumps(fr, indent=2, sort_keys=True) + "\n")
+    print(f"Stage 2 (filter): {fr['valid_count']} valid, {fr['rejected_count']} rejected")
+    valid = [r for r in records if r.get("id") and r.get("category") and isinstance(r.get("value"), (int, float)) and r["value"] >= 0]
+    ar = stage_aggregate(workspace, valid, filter_hash)
+    agg_hash = sha256_bytes(canonical_json(ar))
+    ar["stage_hash"] = agg_hash
+    (out / "stage_aggregate.json").write_text(json.dumps(ar, indent=2, sort_keys=True) + "\n")
+    print(f"Stage 3 (aggregate): {len(ar['categories'])} categories")
+    cr = stage_classify(workspace, valid, ar["stats"], agg_hash)
+    classify_hash = sha256_bytes(canonical_json(cr))
+    cr["stage_hash"] = classify_hash
+    (out / "stage_classify.json").write_text(json.dumps(cr, indent=2, sort_keys=True) + "\n")
+    print(f"Stage 4 (classify): {cr['tier_counts']}")
+    report = stage_report(workspace, pr, fr, ar, cr, classify_hash)
+    rh = sha256_bytes(canonical_json(report))
+    report["stage_hash"] = rh
+    (out / "final_report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    (out / "stage_report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    print(f"Stage 5 (report): final_report.json written, hash={rh}")
+
+if __name__ == "__main__":
+    main()

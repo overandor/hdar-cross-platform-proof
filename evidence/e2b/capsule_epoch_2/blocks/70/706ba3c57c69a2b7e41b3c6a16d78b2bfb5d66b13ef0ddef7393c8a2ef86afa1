@@ -1,0 +1,45 @@
+{
+  "categories": [
+    "alpha",
+    "beta",
+    "delta",
+    "gamma"
+  ],
+  "parent_hash": "ebc726ad1d630af52beb622ad899f236179dd56755f9d3d2ffaef8c9a396c24a",
+  "stage": "aggregate",
+  "stage_hash": "2d666655e5ee4c2b84c3c3d96d6fd63880eaaa5c0f4382de792a4859c20ae9d0",
+  "stats": {
+    "alpha": {
+      "count": 13,
+      "max": 117.47,
+      "mean": 100.8808,
+      "median": 104.93,
+      "min": 47.6,
+      "sum": 1311.45
+    },
+    "beta": {
+      "count": 13,
+      "max": 252.44,
+      "mean": 183.3,
+      "median": 188.24,
+      "min": 140.11,
+      "sum": 2382.9
+    },
+    "delta": {
+      "count": 12,
+      "max": 369.81,
+      "mean": 304.3608,
+      "median": 328.71,
+      "min": 209.13,
+      "sum": 3652.33
+    },
+    "gamma": {
+      "count": 12,
+      "max": 58.47,
+      "mean": 50.9042,
+      "median": 52.32,
+      "min": 40.84,
+      "sum": 610.85
+    }
+  }
+}

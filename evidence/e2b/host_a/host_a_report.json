@@ -1,0 +1,57 @@
+{
+  "capsule_epoch_1": {
+    "epoch": 1,
+    "file_count": 5,
+    "manifest_hash": "ff4e7adacc1d143e66f784399c349ce085ac2f926a1a1da502bdc291f25b08d4",
+    "total_size": 9964,
+    "workspace_root_hash": "9adaf181aacbfa9c971f3be4226a97db6bfb20a0b2d635208d067ee115bfdf4e"
+  },
+  "claim": "Host A sealed Epoch 1 with Ed25519 owner signature. Private key never leaves Host A.",
+  "generated_embedded_runner": {
+    "bytes": 40966,
+    "path": "run_host_b.py",
+    "sha256": "117fba60718089e76f056b8928e1a76e00a5c4c9154ec10752e9534dbed8d7db"
+  },
+  "host_a_platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "host_a_python": "3.13.12 | packaged by Anaconda, Inc. | (main, Feb 24 2026, 16:07:20) [Clang 20.1.8 ]",
+  "host_a_runtime_destroyed": true,
+  "host_a_timestamp": 1784743451.4722078,
+  "owner_public_key": "d76415e64342c89b43b3ef6f9503fc85338d104a42d571a95d38f70e57e70a7e",
+  "owner_signature_algorithm": "ed25519",
+  "protocol_version": "hdar-canonical/v1.0",
+  "schema": "hdar.host-a-report/v1.0",
+  "source_commit_binding": {
+    "canonical_file_hashes": {
+      "builder": {
+        "filename": "host_a_seal.py",
+        "sha256": "c7198782bbda2245550d5f61a42126cc37015ba9f855f71d2ccc174f950856a7"
+      },
+      "orchestrator": {
+        "filename": "run_proof.py",
+        "sha256": "21e75895c28d3590253c2c1deebae1d485fa13cd87e7a2dc72618e28b0ac1115"
+      },
+      "runner_template": {
+        "filename": "run_host_b.py",
+        "sha256": "0a622342f0c40d867e12f9b16aeb3404aa0b43d4063c7cd28b39aa0f3d7f5246"
+      },
+      "verifier_template": {
+        "filename": "verify_all.py",
+        "sha256": "b8630972c8301a87d401532e2e7d7b123da70775708ec5a13f759dcd38ea5009"
+      }
+    },
+    "commit_sha": "f68fc16c3beda7ba1415fbf11bf19d8d515fd0af",
+    "dirty_files": [
+      "M evidence/verifier_report_latest.json"
+    ],
+    "dirty_tree": true,
+    "generated_embedded_runner_bytes": 40966,
+    "generated_embedded_runner_sha256": "117fba60718089e76f056b8928e1a76e00a5c4c9154ec10752e9534dbed8d7db",
+    "protocol_version": "hdar-canonical/v1.0",
+    "repository": "https://github.com/overandor/hdar-cross-platform-proof.git"
+  },
+  "transport_capsule": {
+    "bytes": 10960,
+    "path": "transport_capsule_epoch_1.tar.gz",
+    "sha256": "c6de0b6aa4bf6733d800a2c3e7a4a5625ebee042522d763d5b4c34a9b987ab31"
+  }
+}
