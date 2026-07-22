@@ -53,7 +53,7 @@ def main() -> int:
 
     # Start sandbox
     print("\n[1/5] Starting E2B sandbox...")
-    sandbox = Sandbox()
+    sandbox = Sandbox.create()
     print(f"  Sandbox ID: {sandbox.sandbox_id}")
     print(f"  Sandbox started")
 
@@ -106,29 +106,54 @@ def main() -> int:
         e2_dir.mkdir(parents=True, exist_ok=True)
 
         # List and download all files in capsule_epoch_2
-        def download_dir(remote_path: str, local_path: Path):
-            entries = sandbox.files.list(remote_path)
+        def download_dir(remote_path: str, local_path: Path) -> int:
+            downloaded = 0
+            try:
+                entries = sandbox.files.list(remote_path)
+            except Exception as e:
+                print(f"  ERROR listing {remote_path}: {e}", file=sys.stderr)
+                return 0
+            if not entries:
+                print(f"  WARNING: {remote_path} is empty or does not exist", file=sys.stderr)
+                return 0
             for entry in entries:
                 remote_full = f"{remote_path}/{entry.name}"
                 local_full = local_path / entry.name
                 if entry.is_dir:
                     local_full.mkdir(parents=True, exist_ok=True)
-                    download_dir(remote_full, local_full)
+                    downloaded += download_dir(remote_full, local_full)
                 else:
-                    content = sandbox.files.read(remote_full)
-                    local_full.write_bytes(content if isinstance(content, bytes) else content.encode())
-                    print(f"  Downloaded: {local_full}")
+                    try:
+                        content = sandbox.files.read(remote_full)
+                        local_full.write_bytes(content if isinstance(content, bytes) else content.encode())
+                        print(f"  Downloaded: {local_full} ({local_full.stat().st_size} bytes)")
+                        downloaded += 1
+                    except Exception as e:
+                        print(f"  ERROR downloading {remote_full}: {e}", file=sys.stderr)
+            return downloaded
 
-        download_dir("/home/user/host_b_output/capsule_epoch_2", e2_dir)
+        capsule_file_count = download_dir("/home/user/host_b_output/capsule_epoch_2", e2_dir)
+        print(f"  Capsule files downloaded: {capsule_file_count}")
+
+        if capsule_file_count == 0:
+            print("FATAL: No capsule files downloaded — sandbox will be killed but evidence is incomplete", file=sys.stderr)
+            # Don't return yet — still kill sandbox and generate receipt
+
+        # Verify downloaded files actually exist on disk
+        local_files = list(e2_dir.rglob("*"))
+        local_files = [f for f in local_files if f.is_file()]
+        print(f"  Local capsule files on disk: {len(local_files)}")
+        if len(local_files) != capsule_file_count:
+            print(f"  WARNING: Mismatch — downloaded {capsule_file_count} but found {len(local_files)} on disk", file=sys.stderr)
 
         # Also download the E2 tar
         try:
             e2_tar_content = sandbox.files.read("/home/user/host_b_output/transport_capsule_epoch_2.tar.gz")
             e2_tar_path = out_dir / "transport_capsule_epoch_2.tar.gz"
             e2_tar_path.write_bytes(e2_tar_content if isinstance(e2_tar_content, bytes) else e2_tar_content.encode())
-            print(f"  Downloaded: {e2_tar_path}")
-        except Exception:
-            pass
+            print(f"  Downloaded: {e2_tar_path} ({e2_tar_path.stat().st_size} bytes)")
+        except Exception as e:
+            print(f"  WARNING: Could not download transport tar: {e}", file=sys.stderr)
 
     finally:
         # Kill sandbox and generate termination receipt
@@ -172,11 +197,26 @@ def main() -> int:
         print(f"  Termination receipt: {receipt_path}")
         print(f"  Confirmed dead: {termination_confirmed}")
 
+    # Post-kill evidence verification
     print("\n" + "=" * 60)
     print(f"E2B Host B complete. Artifacts in: {out_dir}")
     print("=" * 60)
-    print(f"  host_b_report.json")
-    print(f"  capsule_epoch_2/")
+
+    report_exists = report_path.exists()
+    capsule_files = [f for f in e2_dir.rglob("*") if f.is_file()] if e2_dir.exists() else []
+    tar_exists = (out_dir / "transport_capsule_epoch_2.tar.gz").exists()
+
+    print(f"  host_b_report.json: {'PRESENT' if report_exists else 'MISSING'}")
+    print(f"  capsule_epoch_2/: {len(capsule_files)} files")
+    for f in capsule_files:
+        print(f"    {f.relative_to(e2_dir)} ({f.stat().st_size} bytes)")
+    print(f"  transport_capsule_epoch_2.tar.gz: {'PRESENT' if tar_exists else 'MISSING'}")
+
+    if not report_exists or len(capsule_files) == 0:
+        print("\nFATAL: Evidence incomplete — report or capsule files missing.", file=sys.stderr)
+        print("The sandbox was killed but artifacts were not fully downloaded.", file=sys.stderr)
+        return 1
+
     print()
     print("Verify on Host A:")
     print(f"  python3 verify_all.py --host-a-dir <host_a_dir> \\")
