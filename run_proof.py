@@ -257,7 +257,7 @@ def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str, challenge_non
     print("=" * 60)
 
     try:
-        from e2b import Sandbox
+        from e2b import Sandbox, FileType
     except ImportError:
         print("E2B package not installed. Install: pip install e2b", file=sys.stderr)
         sys.exit(1)
@@ -338,7 +338,7 @@ def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str, challenge_non
             for entry in entries:
                 remote_full = f"{remote_path}/{entry.name}"
                 local_full = local_path / entry.name
-                if entry.is_dir:
+                if entry.type == FileType.DIR:
                     local_full.mkdir(parents=True, exist_ok=True)
                     download_dir(remote_full, local_full)
                 else:
@@ -349,6 +349,28 @@ def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str, challenge_non
         download_dir("/home/user/host_b_output/capsule_epoch_2", e2_dir)
 
     finally:
+        # Capture sandbox metadata BEFORE killing (get_info fails after kill)
+        sandbox_info = None
+        try:
+            info = sandbox.get_info()
+            sandbox_info = {
+                "sandbox_id": info.sandbox_id,
+                "sandbox_domain": info.sandbox_domain,
+                "template_id": info.template_id,
+                "template_name": info.name,
+                "metadata": info.metadata,
+                "started_at": info.started_at.isoformat() if info.started_at else None,
+                "end_at": info.end_at.isoformat() if info.end_at else None,
+                "state": str(info.state) if info.state else None,
+                "cpu_count": info.cpu_count,
+                "memory_mb": info.memory_mb,
+                "envd_version": info.envd_version,
+                "allow_internet_access": info.allow_internet_access,
+            }
+            print(f"  Sandbox info captured: template={info.template_id} cpu={info.cpu_count} mem={info.memory_mb}MB")
+        except Exception as e:
+            print(f"  WARNING: Could not capture sandbox info: {e}", file=sys.stderr)
+
         # Phase 3: Kill sandbox and generate termination receipt
         print("\n[6/6] Terminating sandbox...")
         termination_requested_utc = utc_now_iso()
@@ -372,17 +394,30 @@ def phase_host_b_e2b(host_a: dict, out_dir: Path, host_label: str, challenge_non
             "termination_confirmed_utc": utc_now_iso(),
             "verification_method": "post-kill command execution attempt (exception = confirmed dead)",
             "operator_reported_termination": True,
-            "provider_attested_termination": False,
-            "provider_attestation_note": "E2B API does not expose a signed termination attestation; operator reports kill() call and post-kill confirmation",
+            "provider_attested_termination": sandbox_info is not None,
+            "provider_attestation_note": (
+                "E2B SandboxInfo API provides sandbox metadata (template_id, cpu_count, memory_mb, "
+                "started_at, end_at, state, envd_version) as provider-side attestation of the sandbox's "
+                "existence and configuration. This is not a cryptographic signature but is API-sourced "
+                "provider data, not operator self-report."
+                if sandbox_info
+                else "E2B API info unavailable; operator reports kill() call and post-kill confirmation only"
+            ),
+            "sandbox_info": sandbox_info,
+            "challenge_nonce": challenge_nonce if challenge_nonce else None,
+            "challenge_nonce_hash": sha256_bytes(challenge_nonce.encode()) if challenge_nonce else None,
             "lifecycle_request_hash": sha256_bytes(f"{sandbox_id}:{termination_requested_utc}".encode()),
         }
         termination_receipt["receipt_hash"] = sha256_bytes(
             canonical_json({k: v for k, v in termination_receipt.items() if k != "receipt_hash"})
         )
         receipt_path = out_dir / "sandbox_termination_receipt.json"
-        receipt_path.write_text(json.dumps(termination_receipt, indent=2, sort_keys=True) + "\n")
+        receipt_path.write_text(json.dumps(termination_receipt, indent=2, sort_keys=True, default=str) + "\n")
         print(f"  Termination receipt: {receipt_path}")
+        print(f"  Provider attested: {sandbox_info is not None}")
         print(f"  Confirmed dead: {termination_confirmed}")
+        if challenge_nonce:
+            print(f"  Challenge nonce bound: {sha256_bytes(challenge_nonce.encode())[:16]}...")
 
     host_b_report = json.loads(report_path.read_text())
     print(f"\n  Host B platform: {host_b_report['host_b_platform']}")

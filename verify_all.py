@@ -418,6 +418,20 @@ def verify_single_host_b(
         check("Sandbox termination: lifecycle request hash present",
               lifecycle_hash_present,
               f"hash={term_receipt.get('lifecycle_request_hash', '')[:16]}..." if lifecycle_hash_present else "missing")
+        # Challenge nonce check (optional — only if present in receipt)
+        challenge_nonce = term_receipt.get("challenge_nonce")
+        challenge_nonce_hash = term_receipt.get("challenge_nonce_hash")
+        if challenge_nonce:
+            # Verify the hash matches the nonce
+            expected_hash = hashlib.sha256(challenge_nonce.encode()).hexdigest()
+            check("Sandbox termination: challenge nonce hash valid",
+                  challenge_nonce_hash == expected_hash,
+                  f"nonce={challenge_nonce[:16]}... hash_match={challenge_nonce_hash == expected_hash}")
+            # Verify the nonce appears in the host_b_report (bound by Host B)
+            report_challenge_nonce = host_b_report.get("challenge_nonce")
+            check("Sandbox termination: challenge nonce bound in host_b_report",
+                  report_challenge_nonce == challenge_nonce,
+                  f"receipt_nonce={challenge_nonce[:16]}... report_nonce={report_challenge_nonce[:16] if report_challenge_nonce else 'MISSING'}...")
     else:
         # Not an E2B run — skip silently (not a failure)
         pass
