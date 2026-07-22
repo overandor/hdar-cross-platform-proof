@@ -31,6 +31,10 @@ jobs:
         run: |
           python3 test_failure_injection.py
 
+      - name: Run end-to-end pipeline test
+        run: |
+          python3 test_end_to_end.py
+
   verify-rust:
     name: Independent Rust Verifier
     runs-on: ubuntu-latest
