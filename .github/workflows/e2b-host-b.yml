@@ -57,34 +57,10 @@ jobs:
 
       - name: Generate attestation manifest
         run: |
-          python3 -c "
-          import json, hashlib, os, platform, subprocess
-          from datetime import datetime, timezone
-          attestation = {
-            'schema': 'hdar.ci-attestation/v1.0',
-            'generated_utc': datetime.now(timezone.utc).isoformat(),
-            'github_run_id': os.environ.get('GITHUB_RUN_ID', ''),
-            'github_run_number': os.environ.get('GITHUB_RUN_NUMBER', ''),
-            'github_sha': os.environ.get('GITHUB_SHA', ''),
-            'github_ref': os.environ.get('GITHUB_REF', ''),
-            'github_actor': os.environ.get('GITHUB_ACTOR', ''),
-            'runner_os': platform.platform(),
-            'runner_hostname': platform.node(),
-            'workflow': os.environ.get('GITHUB_WORKFLOW', ''),
-            'job': os.environ.get('GITHUB_JOB', ''),
-            'e2b_provider': 'e2b.dev',
-            'evidence_files': [],
-          }
-          for root, dirs, files in os.walk('evidence/e2b'):
-            for fn in files:
-              p = os.path.join(root, fn)
-              if os.path.isfile(p):
-                h = hashlib.sha256(open(p,'rb').read()).hexdigest()
-                attestation['evidence_files'].append({'path': p, 'sha256': h, 'size': os.path.getsize(p)})
-          with open('evidence/e2b/attestation.json','w') as f:
-            json.dump(attestation, f, indent=2)
-          print(f'Attestation: {len(attestation["evidence_files"])} files fingerprinted')
-          "
+          python3 generate_attestation.py \
+            --evidence-dir evidence/e2b \
+            --out evidence/e2b/attestation.json \
+            --provider "e2b.dev"
 
       - name: Upload E2B evidence
         uses: actions/upload-artifact@v4
