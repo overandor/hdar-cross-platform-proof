@@ -56,28 +56,39 @@ def build_colab_actions(
         notebook_github_url = "https://colab.research.google.com/github/overandor/hdar-cross-platform-proof/blob/main/hdar_host_b_colab.ipynb"
 
     actions = [
-        # Step 1: Navigate to Colab (triggers login if not authenticated)
-        {"action": "goto", "intent": notebook_github_url, "wait": 5.0},
-        {"action": "digest"},
-
-        # Step 2: Login flow — only needed if redirected to Google sign-in
-        {"action": "type", "intent": "email input field", "value": google_email},
-        {"action": "click", "intent": "next continue button", "wait": 5.0},
-
-        # Google login — type password
-        {"action": "type", "intent": "password input field", "value": google_password},
-        {"action": "click", "intent": "next sign in button", "wait": 8.0},
-
-        # Step 3: After login, Colab should load the notebook from GitHub
+        # Step 1: Navigate to the GitHub-hosted notebook in Colab
+        # This triggers Google login if not authenticated
         {"action": "goto", "intent": notebook_github_url, "wait": 8.0},
-        {"action": "digest"},
+
+        # Step 2: Login flow — type email, wait for password page to load
+        {"action": "type", "intent": "email input field", "value": google_email, "wait": 2.0},
+        {"action": "click", "intent": "next continue button", "wait": 8.0},
+
+        # Wait for password field to appear (Google does AJAX navigation)
+        {"action": "wait", "wait": 3.0},
+
+        # Type password and submit
+        {"action": "type", "intent": "password input field", "value": google_password, "wait": 2.0},
+        {"action": "click", "intent": "next sign in button", "wait": 10.0},
+
+        # Step 3: After login, navigate back to the notebook
+        # (login may redirect to a different page)
+        {"action": "goto", "intent": notebook_github_url, "wait": 10.0},
+
+        # Wait for Colab to fully load the notebook and connect a runtime
+        {"action": "wait", "wait": 10.0},
 
         # Step 4: Run all cells via Runtime menu
-        {"action": "click", "intent": "runtime menu", "wait": 2.0},
-        {"action": "click", "intent": "run all cells run all", "wait": 90.0},
+        # Colab menus are slow to render — wait after each click
+        {"action": "click", "intent": "runtime menu", "wait": 3.0},
+        {"action": "click", "intent": "run all run all", "wait": 120.0},
 
-        # Step 5: Extract page content — the tunnel URL will be in cell output
-        {"action": "markdown"},
+        # Step 5: Wait for cells to finish executing
+        # The notebook installs deps, runs the protocol, starts ngrok
+        {"action": "wait", "wait": 30.0},
+
+        # Step 6: Extract page content — the tunnel URL will be in cell output
+        {"action": "markdown", "wait": 5.0},
         {"action": "digest"},
     ]
 
@@ -124,7 +135,7 @@ def main() -> int:
     ap.add_argument("--google-email", required=True, help="Google account email")
     ap.add_argument("--google-password", required=True, help="Google account password")
     ap.add_argument("--out", default="./evidence/colab", help="Output directory")
-    ap.add_argument("--timeout", type=int, default=300, help="Burchi script timeout")
+    ap.add_argument("--timeout", type=int, default=600, help="Burchi script timeout")
     ap.add_argument("--notebook-url", default="", help="Colab URL for GitHub-hosted notebook")
     args = ap.parse_args()
 
