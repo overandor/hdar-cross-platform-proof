@@ -49,22 +49,6 @@ jobs:
             --out /tmp/hdar_colab_notebook.ipynb
           echo "Notebook generated: $(wc -c < /tmp/hdar_colab_notebook.ipynb) bytes"
 
-      - name: Create evidence gist
-        id: gist
-        run: |
-          GIST_ID=$(python3 -c "
-          import subprocess, json
-          result = subprocess.run(
-              ['gh', 'gist', 'create', '--public', '-'],
-              input='HDAR evidence placeholder\n',
-              capture_output=True, text=True
-          )
-          url = result.stdout.strip()
-          print(url.split('/')[-1])
-          ")
-          echo "Gist ID: $GIST_ID"
-          echo "id=$GIST_ID" >> $GITHUB_OUTPUT
-
       - name: Determine Google credentials
         id: creds
         run: |
@@ -85,16 +69,33 @@ jobs:
             --runner /tmp/release_extracted/host_a/run_host_b.py \
             --google-email "${{ steps.creds.outputs.email }}" \
             --google-password "$GOOGLE_PASSWORD" \
-            --gist-id "${{ steps.gist.outputs.id }}" \
             --out evidence/colab \
             --timeout 300
 
-      - name: Wait for evidence from Colab
+      - name: Extract tunnel URL and fetch evidence
         run: |
-          python3 webhook_receiver.py \
-            --gist-id "${{ steps.gist.outputs.id }}" \
-            --out evidence/colab \
-            --timeout 300
+          TUNNEL_URL=$(python3 -c "
+          import json, re
+          with open('evidence/colab/burchi_raw_result.json') as f:
+              data = json.load(f)
+          raw = json.dumps(data)
+          match = re.search(r'HDAR_TUNNEL_URL=(https?://[^\s\"]+)', raw)
+          if match:
+              print(match.group(1))
+          ")
+          if [ -z "$TUNNEL_URL" ]; then
+            echo "No tunnel URL found in Burchi output. Trying raw file mode..."
+            python3 evidence_fetcher.py \
+              --raw-file evidence/colab/burchi_raw_result.json \
+              --out evidence/colab \
+              --timeout 300
+          else
+            echo "Tunnel URL: $TUNNEL_URL"
+            python3 evidence_fetcher.py \
+              --tunnel-url "$TUNNEL_URL" \
+              --out evidence/colab \
+              --timeout 300
+          fi
 
       - name: Upload Colab evidence
         uses: actions/upload-artifact@v4
