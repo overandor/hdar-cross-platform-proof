@@ -9,6 +9,8 @@ The Colab server must be running (browser tab open on any machine).
 The Gradio public URL is the "synthetic API key" — set it as
 COLAB_GRADIO_URL in GitHub Actions secrets.
 
+Uses plain requests — no gradio_client dependency.
+
 Usage:
     python3 colab_client.py \\
         --url https://abc123.gradio.live \\
@@ -28,28 +30,83 @@ import os
 import sys
 import tarfile
 import io
+import time
 from pathlib import Path
+
+import requests
 
 
 def call_colab_server(url: str, runner_b64: str, timeout: int = 180) -> dict:
-    """Call the Gradio API on Colab and return the result dict."""
-    try:
-        from gradio_client import Client
-    except ImportError:
-        print("ERROR: gradio_client not installed. Install: pip install gradio_client", file=sys.stderr)
-        sys.exit(1)
+    """Call the Gradio REST API on Colab and return the result dict.
 
-    # Gradio Client connects to the public URL
-    client = Client(url)
+    Gradio's REST API works in two steps:
+    1. POST /call/run_host_b with {"data": [runner_b64]} → {"event_id": "..."}
+    2. GET /call/run_host_b/{event_id} → SSE stream, result in final event
+    """
+    base = url.rstrip("/")
+    api_name = "run_host_b"
 
-    # Call the run_host_b API endpoint
-    # The fn_index or api_name maps to the function we exposed
-    result = client.predict(
-        runner_b64,
-        api_name="/run_host_b",
+    # Step 1: submit the request
+    print(f"  POST {base}/call/{api_name}")
+    resp = requests.post(
+        f"{base}/call/{api_name}",
+        json={"data": [runner_b64]},
+        timeout=30,
     )
+    if resp.status_code != 200:
+        raise RuntimeError(f"Gradio submit failed: HTTP {resp.status_code}: {resp.text[:200]}")
 
-    return result
+    event_id = resp.json().get("event_id")
+    if not event_id:
+        raise RuntimeError(f"No event_id in response: {resp.text[:200]}")
+    print(f"  Event ID: {event_id}")
+
+    # Step 2: poll the SSE stream for the result
+    deadline = time.time() + timeout
+    sse_url = f"{base}/call/{api_name}/{event_id}"
+    print(f"  GET {sse_url} (polling until result or {timeout}s timeout)")
+
+    while time.time() < deadline:
+        try:
+            sse_resp = requests.get(sse_url, stream=True, timeout=min(60, int(deadline - time.time()) + 5))
+            for line in sse_resp.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                # SSE format: "event: complete" then "data: [...]"
+                if line.startswith("event:"):
+                    event_type = line.split(":", 1)[1].strip()
+                    continue
+                if line.startswith("data:"):
+                    data_str = line.split(":", 1)[1].strip()
+                    try:
+                        data = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
+
+                    # Gradio returns the result as a list: [output_value]
+                    # Our function returns a dict, so data[0] should be the dict
+                    if isinstance(data, list) and len(data) > 0:
+                        result = data[0]
+                        if isinstance(result, dict):
+                            return result
+                        # Some Gradio versions wrap differently
+                        return {"success": False, "error": f"Unexpected result format: {str(result)[:200]}"}
+
+                    # Could be an error event
+                    if isinstance(data, dict):
+                        return data
+
+            # Stream ended without result — retry
+            print("  Stream ended without result, retrying...")
+            time.sleep(2)
+        except requests.exceptions.Timeout:
+            print("  Poll timeout, retrying...")
+            time.sleep(2)
+        except Exception as e:
+            print(f"  Poll error: {e}, retrying...")
+            time.sleep(2)
+
+    raise RuntimeError(f"Timed out after {timeout}s waiting for Gradio result")
 
 
 def main() -> int:
@@ -81,7 +138,11 @@ def main() -> int:
     print(f"Connecting to Colab Gradio server: {args.url}")
     print("Sending runner script and waiting for Host B execution...")
 
-    result = call_colab_server(args.url, runner_b64, timeout=args.timeout)
+    try:
+        result = call_colab_server(args.url, runner_b64, timeout=args.timeout)
+    except Exception as e:
+        print(f"FATAL: Failed to call Colab server: {e}", file=sys.stderr)
+        return 1
 
     if not result or not result.get("success"):
         error = result.get("error", "unknown error") if result else "no response"

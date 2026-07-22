@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install cryptography gradio_client
+          pip install cryptography requests
 
       - name: Build release bundle and extract runner
         run: |
