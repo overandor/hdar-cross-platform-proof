@@ -1,0 +1,137 @@
+name: HDAR Colab Host B (Burchi)
+
+on:
+  workflow_dispatch:
+    inputs:
+      google_email:
+        description: 'Google account email for Colab'
+        required: true
+        default: ''
+
+jobs:
+  # ─── Job 1: macOS — Burchi drives Colab via WKWebView ───
+  colab-burchi:
+    name: Burchi → Colab (macOS)
+    runs-on: macos-14
+    env:
+      GOOGLE_EMAIL: ${{ secrets.GOOGLE_EMAIL }}
+      GOOGLE_PASSWORD: ${{ secrets.GOOGLE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install cryptography
+
+      - name: Build release bundle
+        run: |
+          python3 release.py build --out /tmp/hdar_release_build
+          python3 release.py verify /tmp/hdar_release_build/release_bundle.tar.gz
+          mkdir -p /tmp/release_extracted
+          tar xzf /tmp/hdar_release_build/release_bundle.tar.gz -C /tmp/release_extracted
+
+      - name: Build Burchi from source
+        run: |
+          git clone https://github.com/overandor/burchi.git /tmp/burchi
+          cd /tmp/burchi
+          swift build -c release
+          cp .build/release/burchi /tmp/burchi-bin
+          echo "Burchi built: $(/tmp/burchi-bin --help 2>&1 | head -1)"
+
+      - name: Generate Colab notebook from runner
+        run: |
+          python3 generate_colab_notebook.py \
+            --runner /tmp/release_extracted/host_a/run_host_b.py \
+            --out /tmp/hdar_colab_notebook.ipynb
+          echo "Notebook generated: $(wc -c < /tmp/hdar_colab_notebook.ipynb) bytes"
+
+      - name: Determine Google credentials
+        id: creds
+        run: |
+          EMAIL="${{ github.event.inputs.google_email }}"
+          if [ -z "$EMAIL" ]; then
+            EMAIL="$GOOGLE_EMAIL"
+          fi
+          if [ -z "$EMAIL" ] || [ -z "$GOOGLE_PASSWORD" ]; then
+            echo "ERROR: Google credentials not provided. Set GOOGLE_EMAIL and GOOGLE_PASSWORD secrets."
+            exit 1
+          fi
+          echo "email=$EMAIL" >> $GITHUB_OUTPUT
+
+      - name: Run Burchi Colab driver
+        run: |
+          python3 colab_burchi_driver.py \
+            --burchi /tmp/burchi-bin \
+            --runner /tmp/release_extracted/host_a/run_host_b.py \
+            --google-email "${{ steps.creds.outputs.email }}" \
+            --google-password "$GOOGLE_PASSWORD" \
+            --out evidence/colab \
+            --timeout 300
+
+      - name: Upload Colab evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: colab-burchi-evidence
+          path: evidence/colab/
+          retention-days: 90
+
+  # ─── Job 2: Linux — verify the evidence ───
+  verify-colab:
+    name: Verify Colab evidence (Linux)
+    runs-on: ubuntu-latest
+    needs: colab-burchi
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install cryptography
+
+      - name: Download Colab evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: colab-burchi-evidence
+          path: evidence/colab/
+
+      - name: Verify Colab evidence
+        run: |
+          ls -la evidence/colab/
+          if [ ! -f evidence/colab/host_b_report.json ]; then
+            echo "FATAL: host_b_report.json not found in evidence"
+            exit 1
+          fi
+          python3 verify_all.py \
+            --host-a-dir . \
+            --host-b-report evidence/colab/host_b_report.json \
+            --e2-capsule evidence/colab/capsule_epoch_2
+
+      - name: Check platform separation
+        run: |
+          python3 -c "
+          import json
+          with open('evidence/colab/host_b_report.json') as f:
+              report = json.load(f)
+          platform = report.get('host_b_identity', {}).get('platform', '')
+          hostname = report.get('host_b_identity', {}).get('machine_hostname', '')
+          print(f'Colab platform: {platform}')
+          print(f'Colab hostname: {hostname}')
+          if 'Linux' not in platform:
+              print('WARNING: Expected Linux platform from Colab')
+          "
+
+      - name: Upload verification report
+        uses: actions/upload-artifact@v4
+        with:
+          name: colab-verification-report
+          path: |
+            evidence/colab/
+            verifier_report_latest.json
+          retention-days: 90
