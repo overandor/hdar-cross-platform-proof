@@ -563,11 +563,20 @@ def verify_release(bundle_path: Path) -> int:
               e1_expected == e1_manifest["manifest_hash"])
 
         # 10. E1 receipt hash valid
+        #     New evidence: receipt hash computed over subset excluding manifest_hash
+        #     and receipt_hash (to avoid circular dependency with manifest binding).
+        #     Old evidence: receipt hash computed over all fields except receipt_hash.
+        #     Try both methods for backward compatibility (matches verify_all.py).
         e1_receipt = json.loads((tmp / "host_a" / "capsule_epoch_1" / "receipt.json").read_text())
-        e1_r_expected = sha256_bytes(canonical_json(
+        e1_r_expected_new = sha256_bytes(canonical_json(
+            {k: v for k, v in e1_receipt.items() if k != "receipt_hash" and k != "manifest_hash"}
+        ))
+        e1_r_expected_old = sha256_bytes(canonical_json(
             {k: v for k, v in e1_receipt.items() if k != "receipt_hash"}
         ))
-        check("E1 receipt hash valid", e1_r_expected == e1_receipt["receipt_hash"])
+        check("E1 receipt hash valid",
+              e1_r_expected_new == e1_receipt["receipt_hash"] or
+              e1_r_expected_old == e1_receipt["receipt_hash"])
 
         # 11. E1 content blocks all present and valid
         blocks_dir = tmp / "host_a" / "capsule_epoch_1" / "blocks"
