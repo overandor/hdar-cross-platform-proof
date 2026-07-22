@@ -42,6 +42,7 @@ def build_colab_actions(
     google_email: str,
     google_password: str,
     out_dir: str,
+    gist_id: str = "",
 ) -> list[dict]:
     """Build the Burchi JSON action script for Colab automation.
 
@@ -50,7 +51,7 @@ def build_colab_actions(
     Colab's remote VM filesystem.
 
     Strategy: Burchi handles the login flow (semantic, self-healing).
-    The notebook itself posts evidence to an HTTP webhook endpoint.
+    The notebook posts evidence to a GitHub Gist via the gist ID.
     """
     actions = [
         # Step 1: Navigate to Colab
@@ -69,19 +70,32 @@ def build_colab_actions(
         {"action": "type", "intent": "password input field", "value": google_password},
         {"action": "click", "intent": "next sign in button", "wait": 5.0},
 
-        # Step 3: After login, navigate to the pre-loaded notebook
-        # The notebook URL must be provided separately — Burchi navigates to it
-        # {"action": "goto", "intent": notebook_url, "wait": 5.0},
+        # Step 3: After login, open a new notebook
+        {"action": "goto", "intent": "https://colab.research.google.com/#create=true", "wait": 5.0},
 
-        # Step 4: Run all cells
+        # Step 4: Type the gist ID into the first code cell so the notebook
+        # can post evidence back. The notebook code is pre-loaded via the
+        # generate_colab_notebook.py output, but for automation we type
+        # the gist ID into a cell and run it.
+    ]
+
+    if gist_id:
+        # Type a cell that sets HDAR_WEBHOOK_URL environment variable
+        # The notebook's webhook cell reads this to post evidence
+        gist_url = f"https://gist.github.com/{gist_id}"
+        actions.append({"action": "type", "intent": "code cell input", "value": f"import os; os.environ['HDAR_GIST_ID'] = '{gist_id}'"})
+        actions.append({"action": "click", "intent": "run cell play button", "wait": 2.0})
+
+    actions.extend([
+        # Step 5: Run all cells
         {"action": "find", "intent": "runtime run all"},
         {"action": "click", "intent": "runtime menu", "wait": 1.0},
         {"action": "click", "intent": "run all cells", "wait": 30.0},
 
-        # Step 5: Extract page content (cell outputs visible on page)
+        # Step 6: Extract page content (cell outputs visible on page)
         {"action": "markdown"},
         {"action": "digest"},
-    ]
+    ])
 
     return actions
 
@@ -125,6 +139,7 @@ def main() -> int:
     ap.add_argument("--runner", required=True, help="Path to run_host_b.py")
     ap.add_argument("--google-email", required=True, help="Google account email")
     ap.add_argument("--google-password", required=True, help="Google account password")
+    ap.add_argument("--gist-id", default="", help="GitHub Gist ID for evidence exchange")
     ap.add_argument("--out", default="./evidence/colab", help="Output directory")
     ap.add_argument("--timeout", type=int, default=300, help="Burchi script timeout")
     args = ap.parse_args()
@@ -148,6 +163,7 @@ def main() -> int:
         args.google_email,
         args.google_password,
         str(out_dir),
+        gist_id=args.gist_id,
     )
     actions_json = json.dumps(actions, indent=2)
     print(f"Built {len(actions)} Burchi actions for Colab automation")
