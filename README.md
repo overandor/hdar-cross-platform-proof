@@ -4,17 +4,30 @@ Host-Detached Archival Runtime — cryptographic proof that an agent workspace c
 
 ## Status
 
-**84/84 verifier checks passed. 4/4 platform separations confirmed.**
+**118/118 verifier checks passed. 5/5 platform separations confirmed.**
 
-Host A sealed Epoch 1 on macOS (this Mac). Host B ran on 4 recorded Host B runtime configurations, including one Codespaces environment and three separately provisioned GitHub Actions jobs:
+Host A sealed Epoch 1 on macOS (this Mac). Host B ran on 5 recorded Host B runtime configurations:
 - GitHub Codespaces (Linux 6.8.0, x86_64)
 - GitHub Actions Ubuntu 22.04 (Linux x86_64)
 - GitHub Actions Ubuntu 24.04 (Linux x86_64)
 - GitHub Actions macOS 14 (arm64, separately provisioned runner)
+- **E2B Sandbox (Linux 6.1.158+, x86_64, Firecracker microVM) — 34/34 checks passed, provider-attested**
 
-Each published Host B execution occurred outside Host A; the three GitHub Actions jobs ran on separately provisioned hosted VMs, and the Codespaces execution ran in a development container hosted on a VM.
+Each published Host B execution occurred outside Host A; the three GitHub Actions jobs ran on separately provisioned hosted VMs, the Codespaces execution ran in a development container hosted on a VM, and the E2B execution ran in a Firecracker microVM with provider-side sandbox metadata attestation.
 
-All 4 produced the same pipeline output hash: `8708384aa5f7118c1f1b356e9abfda416c1b3c1c33943498c6016fb29b9d396a`
+All 5 produced the same pipeline output hash: `8708384aa5f7118c1f1b356e9abfda416c1b3c1c33943498c6016fb29b9d396a`
+
+### E2B Live Result (34/34)
+
+The E2B run is the first provider-attested execution. The sandbox termination receipt includes `sandbox_info` from the E2B API (`sandbox_id`, `template_id`, `cpu_count`, `memory_mb`, `started_at`, `end_at`, `state`, `envd_version`) — API-sourced provider metadata, not operator self-report.
+
+- Sandbox ID: `iyrpblwcgocjfmjwin5bm`
+- Host A: `macOS-26.5.2-arm64-arm-64bit-Mach-O`
+- Host B: `Linux-6.1.158+-x86_64-with-glibc2.36` (hostname: `e2b.local`)
+- Platform separation: confirmed
+- E1 manifest hash: `ff4e7adacc1d143e66f784399c349ce085ac2f926a1a1da502bdc291f25b08d4`
+- E2 manifest hash: `0c16f38da30726a57f2e652c06bbfd4a046867eb87f7051000f09e1c7c0de468`
+- Evidence: `evidence/e2b/`
 
 ## One-Command Verification
 
@@ -26,6 +39,17 @@ python3 prove.py
 ```
 
 This runs 21 checks per platform (84 total) against the published evidence. All artifacts are in the repo — no network access to remote platforms needed.
+
+### E2B Evidence Verification
+
+The E2B run has 34 checks (21 base + 13 E2B-specific including sandbox termination receipt, provider attestation, and semantic continuation):
+
+```bash
+python3 verify_all.py \
+  --host-a-dir evidence/e2b/host_a \
+  --host-b-report evidence/e2b/host_b_report.json \
+  --e2-capsule evidence/e2b/capsule_epoch_2
+```
 
 ### Independent Rust Verifier
 
@@ -45,7 +69,7 @@ done
 
 The Rust verifier shares NO code with the Python verifier. It uses independent cryptographic libraries (`sha2` from RustCrypto, `ed25519-dalek`, `serde_json`) and reimplements all 21 checks from the capsule format specification. All 4 platforms pass 21/21.
 
-## What the Verifier Checks (21 per platform)
+## What the Verifier Checks (21 per platform, 34 for E2B)
 
 | # | Check | What it proves |
 |---|---|---|
@@ -67,6 +91,9 @@ The Rust verifier shares NO code with the Python verifier. It uses independent c
 | 19 | Pipeline output hash recomputed from E2 | Deterministic computation verified by recomputing from E2 content blocks, not just checking the report field |
 | 20 | E2 content blocks all valid | No bit rot in E2 capsule |
 | 21 | Source-commit binding + generated runner hash | Evidence bound to specific commit and embedded runner |
+| 22-24 | **E2B only:** Sandbox termination receipt valid, provider attestation has sandbox_info, lifecycle hash present | Sandbox existed on E2B infrastructure, provider metadata bound, termination confirmed |
+| 25-28 | **E2B only:** Semantic continuation (epoch, task_completed, status, previous_manifest_hash) | Agent state advanced correctly across epoch boundary |
+| 29-30 | **E2B only:** Challenge nonce hash valid + bound in report (when nonce provided) | Challenge-response freshness — proves the run is live, not replayed |
 
 ## Honest Claim Boundary
 
@@ -167,7 +194,8 @@ This workflow builds one canonical release bundle, dispatches the **identical** 
 - `generate_colab_notebook.py` — Generates Google Colab notebook
 - `codespaces_setup.sh` — GitHub Codespaces setup script
 - `capsule_epoch_1/` — E1 capsule (manifest, receipt, content-addressed blocks)
-- `evidence/` — Host B reports and E2 capsules from all 4 platforms
+- `evidence/` — Host B reports and E2 capsules from all 5 platforms (Codespaces, GitHub Actions ×3, E2B)
+- `evidence/e2b/` — E2B live run evidence (34/34 checks, provider-attested, includes host_a E1 + host_b E2 + termination receipt with sandbox_info)
 - `TRUST_BOUNDARY.md` — Documents the open Host B identity gap and the attestation roadmap
 
 ## Dependencies
