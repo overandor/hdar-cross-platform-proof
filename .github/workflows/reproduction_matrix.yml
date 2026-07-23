@@ -8,6 +8,10 @@ on:
         required: false
         default: ''
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   host-b-matrix:
     name: Host B on ${{ matrix.os }}
@@ -58,6 +62,22 @@ jobs:
           mkdir -p /tmp/release_extracted
           tar xzf /tmp/release_bundle.tar.gz -C /tmp/release_extracted
           ls /tmp/release_extracted/
+
+      - name: Download gated Hugging Face resource
+        env:
+          HF_OIDC_RESOURCE: josephrw
+          HF_REPOSITORY: josephrw/hdar-cross-platform-proof
+        run: |
+          set -euo pipefail
+
+          curl -LsSf https://hf.co/cli/install.sh | bash
+          export PATH="$HOME/.local/bin:$PATH"
+
+          hf download "$HF_REPOSITORY" \
+            --local-dir /tmp/huggingface-resource
+
+          test -d /tmp/huggingface-resource
+          find /tmp/huggingface-resource -maxdepth 2 -type f | sort
 
       - name: Run Host B with identical E1
         run: |
